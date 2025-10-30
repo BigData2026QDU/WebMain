@@ -5,12 +5,21 @@
 
 #### 技术选型
 1. Apache ECharts 图表
+     - https://echarts.apache.org/zh/index.html
 2. Java Servlet 网页控制器
 3. Html 静态网页
 4. Axios 异步通信
+     - Github: https://github.com/axios/axios
+     - Official Website: https://www.axios.com/
 5. Jackson JSON传输
+     - Github: https://github.com/FasterXML/jackson
+     - Jackson JSON Series: https://www.baeldung.com/jackson
 6. Gsap 动画制作
+     - Github: https://github.com/greensock/GSAP
+     - Official Website: https://gsap.com/
 7.  **OpenRefine 数据清洗** 
+     - Github: https://github.com/OpenRefine
+     - Official Website: https://openrefine.org/
 
 
 #### 数据来源

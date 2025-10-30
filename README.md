@@ -5,8 +5,14 @@
 Gitee 是 OSCHINA 推出的基于 Git 的代码托管平台（同时支持 SVN）。专为开发者提供稳定、高效、安全的云端软件开发协作平台
 无论是个人、团队、或是企业，都能够用 Gitee 实现代码托管、项目管理、协作开发。企业项目请看 [https://gitee.com/enterprises](https://gitee.com/enterprises)}
 
-#### 软件架构
-软件架构说明
+#### 技术选型
+1. Apache ECharts 图表
+2. Java Servlet 网页控制器
+3. Html 静态网页
+4. Axios 异步通信
+5. Jackson JSON传输
+6. Gsap 动画制作
+7. OpenRefine 数据清洗
 
 
 #### 安装教程

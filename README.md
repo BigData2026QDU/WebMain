@@ -16,10 +16,10 @@
 #### 数据来源
 
 1.  **Awesome Public Datasets** : A list of topic-centric public data sources in high quality
-    Github: https://github.com/awesomedata/awesome-public-datasets
-    Official Website: https://awesomedataworld.slack.com
+     - Github: https://github.com/awesomedata/awesome-public-datasets
+     - Official Website: https://awesomedataworld.slack.com
 2.  **Kaggle** : Find Open Datasets and Machine Learning Projects
-    https://www.kaggle.com/datasets
+     - https://www.kaggle.com/datasets
 3.   **Google Dataset Search** : a search engine for datasets
-    https://datasetsearch.research.google.com/help
+     - https://datasetsearch.research.google.com/help
 

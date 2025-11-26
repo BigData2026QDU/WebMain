@@ -20,6 +20,9 @@
 7.  **OpenRefine 数据清洗** 
      - Github: https://github.com/OpenRefine
      - Official Website: https://openrefine.org/
+8. HikariCP数据库连接池
+     - Github: https://github.com/brettwooldridge/HikariCP
+
 
 
 #### 数据来源

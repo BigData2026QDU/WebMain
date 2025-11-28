@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>极简使用示例 - 自动主题切换</title>
+  <link rel="stylesheet" href="css/theme.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>极简使用示例</h1>
+      <p>这个页面只引入了一个 JS 文件，无需编写任何 JavaScript 代码。</p>
+      <p>主题会根据时间自动切换，右上角的按钮也会自动生成。</p>
+    </div>
+
+    <div class="card">
+      <h2>使用方法</h2>
+      <p>只需在 HTML 中引入 JS 文件即可：</p>
+      <div class="theme-info">
+        <pre><code>&lt;script src="js/theme-manager.js"&gt;&lt;/script&gt;</code></pre>
+      </div>
+      <p>就这么简单！无需编写任何额外代码。</p>
+    </div>
+
+    <div class="card">
+      <h2>自定义配置（可选）</h2>
+      <p>如果需要自定义配置，可以通过 data 属性传递：</p>
+      <div class="theme-info">
+        <pre><code>&lt;script 
+  src="js/theme-manager.js"
+  data-day-start="7"
+  data-night-start="19"
+  data-interval="30000"
+&gt;&lt;/script&gt;</code></pre>
+      </div>
+      
+      <h3>可用配置项：</h3>
+      <ul>
+        <li><code>data-day-start</code> - 日间模式开始时间（小时，默认 6）</li>
+        <li><code>data-night-start</code> - 夜间模式开始时间（小时，默认 18）</li>
+        <li><code>data-interval</code> - 自动检测间隔（毫秒，默认 60000）</li>
+        <li><code>data-storage-key</code> - localStorage 键名（默认 'theme-preference'）</li>
+        <li><code>data-manual-override</code> - 是否允许手动覆盖（默认 true）</li>
+        <li><code>data-auto-init</code> - 是否自动初始化（默认 true）</li>
+        <li><code>data-auto-button</code> - 是否自动创建按钮（默认 true）</li>
+        <li><code>data-button-selector</code> - 自定义按钮选择器（可选）</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>高级用法</h2>
+      <p>如果需要通过 JS 控制主题，可以访问全局的 <code>window.themeManager</code> 对象：</p>
+      <div class="theme-info">
+        <pre><code>// 获取当前主题
+console.log(themeManager.getCurrentTheme());
+
+// 手动切换主题
+themeManager.toggleTheme();
+
+// 设置特定主题
+themeManager.setTheme('night');
+
+// 清除保存的偏好，恢复自动模式
+themeManager.clearSavedTheme();</code></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>使用自定义按钮</h2>
+      <p>如果你想使用自己的按钮而不是自动生成的按钮：</p>
+      <div class="theme-info">
+        <pre><code>&lt;button id="myThemeButton"&gt;切换主题&lt;/button&gt;
+
+&lt;script 
+  src="js/theme-manager.js"
+  data-button-selector="#myThemeButton"
+&gt;&lt;/script&gt;</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 只需这一行，一切自动完成 -->
+  <script src="js/theme-manager.js"></script>
+</body>
+</html>

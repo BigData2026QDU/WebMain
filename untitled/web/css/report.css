@@ -138,47 +138,12 @@
   color: var(--text-primary);
 }
 
-.chart-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.chart-row {
-  display: grid;
-  grid-template-columns: 120px 1fr 70px;
-  gap: 0.5rem;
-  align-items: center;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-}
-
-.chart-label {
-  color: var(--text-primary);
-}
-
-.chart-bar-track {
-  position: relative;
-  height: 10px;
-  border-radius: 999px;
+.chart-canvas {
+  width: 100%;
+  min-height: 260px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  overflow: hidden;
-}
-
-.chart-bar-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  background-color: var(--accent-primary);
-  transition: width 0.35s ease;
-}
-
-.chart-value {
-  text-align: right;
-  color: var(--text-primary);
-  font-weight: 600;
+  border-radius: 8px;
 }
 
 .report-actions {

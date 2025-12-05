@@ -3,16 +3,24 @@
     console.error('ReportRenderer 依赖 Request 封装，请确认 request.js 已加载。');
     return;
   }
+  if (!window.echarts) {
+    console.error('ReportRenderer 依赖 ECharts，请在 report-renderer.js 之前引入 echarts.min.js。');
+  }
 
   class ReportRenderer {
     constructor(options = {}) {
       this.container = options.container;
       this.statusElement = options.statusElement || null;
       this.requestFactory = options.requestFactory || ((reportId) => new Request(`加载报告:${reportId}`, `reports/${reportId}`));
+      this.chartInstances = [];
 
       if (!this.container) {
         throw new Error('ReportRenderer 需要传入 container DOM 节点。');
       }
+
+      document.addEventListener('theme:themeChanged', () => {
+        this.refreshCharts();
+      });
     }
 
     setStatus(type, message) {
@@ -109,6 +117,7 @@
         return;
       }
 
+      this.disposeCharts();
       this.container.innerHTML = '';
 
       const wrapper = document.createElement('div');
@@ -301,41 +310,109 @@
       title.textContent = chart.title || '图表';
       chartBlock.appendChild(title);
 
-      const bars = document.createElement('div');
-      bars.className = 'chart-bars';
+      const canvas = document.createElement('div');
+      canvas.className = 'chart-canvas';
+      canvas.style.height = '320px';
+      chartBlock.appendChild(canvas);
 
-      const maxValue = Math.max(...(chart.data || []).map(item => item.value || 0), 1);
+      if (window.echarts) {
+        const instance = echarts.init(canvas);
+        const option = this.buildChartOption(chart);
+        instance.setOption(option);
+        this.chartInstances.push({ instance, chart });
+      } else {
+        const fallback = document.createElement('div');
+        fallback.className = 'empty-state';
+        fallback.textContent = 'ECharts 未加载，无法渲染图表。';
+        chartBlock.appendChild(fallback);
+      }
 
-      (chart.data || []).forEach(item => {
-        const row = document.createElement('div');
-        row.className = 'chart-row';
-
-        const label = document.createElement('div');
-        label.className = 'chart-label';
-        label.textContent = item.label || '项';
-        row.appendChild(label);
-
-        const track = document.createElement('div');
-        track.className = 'chart-bar-track';
-
-        const fill = document.createElement('div');
-        fill.className = 'chart-bar-fill';
-        const width = Math.min(100, Math.round(((item.value || 0) / maxValue) * 100));
-        fill.style.width = `${width}%`;
-        track.appendChild(fill);
-
-        row.appendChild(track);
-
-        const value = document.createElement('div');
-        value.className = 'chart-value';
-        value.textContent = item.value != null ? item.value : '-';
-        row.appendChild(value);
-
-        bars.appendChild(row);
-      });
-
-      chartBlock.appendChild(bars);
       return chartBlock;
+    }
+
+    buildChartOption(chart) {
+      const colors = this.getThemeColors();
+      const labels = (chart.data || []).map(item => item.label || '项');
+      const values = (chart.data || []).map(item => item.value || 0);
+
+      return {
+        backgroundColor: colors.bgPrimary,
+        color: [colors.accentPrimary, colors.accentSecondary],
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          textStyle: { color: colors.textPrimary }
+        },
+        grid: {
+          left: 12,
+          right: 12,
+          top: 24,
+          bottom: 24,
+          containLabel: true
+        },
+        xAxis: {
+          type: 'value',
+          axisLabel: { color: colors.textSecondary },
+          axisLine: { lineStyle: { color: colors.border } },
+          splitLine: { lineStyle: { color: colors.border } }
+        },
+        yAxis: {
+          type: 'category',
+          data: labels,
+          axisLabel: { color: colors.textPrimary },
+          axisLine: { lineStyle: { color: colors.border } },
+          axisTick: { show: false }
+        },
+        series: [
+          {
+            type: 'bar',
+            data: values,
+            barWidth: '50%',
+            itemStyle: {
+              borderRadius: 6
+            },
+            label: {
+              show: true,
+              position: 'right',
+              color: colors.textPrimary
+            }
+          }
+        ],
+        textStyle: {
+          color: colors.textPrimary,
+          fontFamily: 'inherit'
+        }
+      };
+    }
+
+    getThemeColors() {
+      const style = getComputedStyle(document.documentElement);
+      return {
+        bgPrimary: style.getPropertyValue('--bg-primary').trim() || '#ffffff',
+        bgSecondary: style.getPropertyValue('--bg-secondary').trim() || '#f5f5f5',
+        textPrimary: style.getPropertyValue('--text-primary').trim() || '#1a1a1a',
+        textSecondary: style.getPropertyValue('--text-secondary').trim() || '#4a4a4a',
+        border: style.getPropertyValue('--border-color').trim() || '#d0d0d0',
+        accentPrimary: style.getPropertyValue('--accent-primary').trim() || '#3b82f6',
+        accentSecondary: style.getPropertyValue('--accent-secondary').trim() || '#60a5fa'
+      };
+    }
+
+    refreshCharts() {
+      if (!this.chartInstances.length) return;
+      this.chartInstances.forEach(({ instance, chart }) => {
+        const option = this.buildChartOption(chart);
+        instance.setOption(option, true);
+      });
+    }
+
+    disposeCharts() {
+      this.chartInstances.forEach(({ instance }) => {
+        if (instance && instance.dispose) {
+          instance.dispose();
+        }
+      });
+      this.chartInstances = [];
     }
 
     renderEmpty() {

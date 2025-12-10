@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>博客文章</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="stylesheet" href="css/request-capsule.css">
+</head>
+<body>
+  <div class="container">
+    <div id="articleViewer" class="report-viewer"></div>
+  </div>
+
+  <!-- 脚本 -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/6.0.0/echarts.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.9.0/axios.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/request.js"></script>
+  <script src="js/report-renderer.js"></script>
+  <script src="js/theme-manager.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const articleViewer = document.getElementById('articleViewer');
+      const renderer = new ReportRenderer({
+        container: articleViewer,
+        requestFactory: (articleId) => new Request(`加载文章:${articleId}`, `articles/${articleId}`)
+      });
+
+      // 自动加载文章示例
+      const sampleArticle = {
+        title: '深入理解现代Web开发架构',
+        tag: '技术分享',
+        updatedAt: '2025-12-10',
+        source: '张三',
+        summary: '本文探讨现代Web应用的架构设计，从前端到后端，从数据可视化到主题管理，全面解析如何构建一个高质量的Web应用。',
+        sections: [
+          {
+            title: '正文',
+            paragraphs: [
+              '随着Web技术的快速发展，现代Web应用的复杂度越来越高。如何设计一个可维护、可扩展的架构成为了开发者面临的重要挑战。本文将从实际项目出发，分享在构建大数据平台过程中积累的经验和最佳实践。',
+              '在技术选型上，我们采用了Java 17 + Servlet 4.0构建后端服务，前端使用ECharts 6.0实现数据可视化，通过CSS Variables实现主题切换，使用Axios处理HTTP请求，Maven管理项目依赖。这套技术栈经过生产环境验证，具有良好的稳定性和扩展性。',
+              '在设计过程中，我们遵循了模块化、可复用、易维护的原则。前端采用IIFE模式封装各个功能模块，确保代码的独立性和可测试性。主题系统通过CSS自定义属性实现，支持日间/夜间模式的无缝切换，所有组件都能自动适配当前主题。',
+              '性能优化方面，通过CDN加速静态资源加载，使用Axios拦截器统一处理请求，实现了请求的可视化监控。图表渲染采用ECharts的按需加载策略，减少初始加载时间，提升用户体验。从下图可以看到，项目的技术栈分布合理，JavaScript占比最高，体现了前端的重要性。页面加载性能指标也达到了预期目标，FCP控制在1.2秒以内，为用户提供了流畅的访问体验。'
+            ]
+          }
+        ],
+        charts: [
+          {
+            title: '项目技术栈占比',
+            data: [
+              { label: 'JavaScript', value: 45 },
+              { label: 'Java', value: 30 },
+              { label: 'CSS', value: 15 },
+              { label: 'HTML', value: 10 }
+            ]
+          },
+          {
+            title: '页面加载性能指标 (ms)',
+            data: [
+              { label: 'FCP', value: 1200 },
+              { label: 'LCP', value: 2400 },
+              { label: 'TTI', value: 3200 },
+              { label: 'TBT', value: 150 }
+            ]
+          }
+        ],
+        notes: [
+          '本文所述架构已在生产环境稳定运行，可根据实际需求进行调整。',
+          '完整代码示例可在项目仓库中查看。'
+        ]
+      };
+
+      renderer.renderFromPayload({ report: sampleArticle });
+    });
+  </script>
+</body>
+</html>

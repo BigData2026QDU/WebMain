@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>报告管理中心</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/request-capsule.css">
+  <link rel="stylesheet" href="css/report.css">
+  <style>
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .header h1 {
+      margin: 0;
+      color: var(--text-primary);
+    }
+    .card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px var(--shadow-color);
+    }
+    .card p {
+      margin-top: 0.35rem;
+      color: var(--text-secondary);
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.75rem;
+      align-items: center;
+      margin-top: 0.75rem;
+    }
+    .input {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.65rem 0.75rem;
+      font-size: 0.95rem;
+    }
+    .input:focus {
+      outline: 2px solid var(--accent-secondary);
+      outline-offset: 2px;
+    }
+    .button {
+      background-color: var(--accent-primary);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+    }
+    .button:hover {
+      background-color: var(--accent-hover);
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      color: var(--text-secondary);
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--bg-tertiary);
+    }
+    .status-dot.error {
+      background-color: var(--accent-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>报告管理中心</h1>
+      <div class="status" id="pageStatus">
+        <span class="status-dot"></span>
+        <span class="status-text">就绪</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>删除大数据报告</h2>
+      <p>输入报告 ID，使用 `DELETE /reports/{id}` 删除。请求由封装的 Request 类发起，域名/IP 由 axios 封装统一维护。</p>
+      <div class="form-row">
+        <input id="deleteId" class="input" placeholder="例如: daily-001" />
+        <button class="button" id="deleteBtn">删除</button>
+      </div>
+      <div class="status" id="deleteStatus">
+        <span class="status-dot"></span>
+        <span class="status-text">等待操作</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 必须先加载第三方库，再加载封装 -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.9.0/axios.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/request.js"></script>
+  <script src="js/report-renderer.js"></script>
+  <script src="js/theme-manager.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const deleteId = document.getElementById('deleteId');
+      const deleteBtn = document.getElementById('deleteBtn');
+      const deleteStatus = document.getElementById('deleteStatus');
+      const pageStatus = document.getElementById('pageStatus');
+
+      function setStatus(el, type, text) {
+        if (!el) return;
+        const dot = el.querySelector('.status-dot');
+        const msg = el.querySelector('.status-text');
+        if (dot) {
+          dot.classList.toggle('error', type === 'error');
+        }
+        if (msg) {
+          msg.textContent = text || '';
+        }
+      }
+
+      setStatus(pageStatus, 'ready', '管理界面已加载');
+
+      if (deleteBtn && deleteId) {
+        deleteBtn.addEventListener('click', async () => {
+          const value = deleteId.value.trim();
+          if (!value) {
+            alert('请输入要删除的报告 ID');
+            return;
+          }
+          const ok = confirm(`确定删除报告 ${value} 吗？此操作不可恢复。`);
+          if (!ok) return;
+
+          setStatus(deleteStatus, 'loading', `正在删除：${value}`);
+          const req = new Request(`删除报告:${value}`, `reports/${value}`);
+          try {
+            const resp = await req.delete();
+            console.log('删除成功', resp.data);
+            setStatus(deleteStatus, 'ready', `已删除：${value}`);
+            alert('删除成功');
+          } catch (err) {
+            console.error('删除失败', err);
+            setStatus(deleteStatus, 'error', '删除失败，请检查控制台');
+            alert('删除失败，请查看控制台日志');
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

@@ -102,6 +102,19 @@ themeManager.clearSavedTheme();</code></pre>
       <div id="reportViewer" class="report-viewer"></div>
     </div>
 
+    <div class="card">
+      <h2>报告管理（删除）</h2>
+      <p>仅支持删除已有大数据报告，请谨慎操作。</p>
+      <div class="report-actions">
+        <input id="deleteReportIdInput" class="input" placeholder="输入要删除的报告 ID，例如 daily-001" />
+        <button class="button" id="deleteReportButton">删除报告</button>
+        <div class="report-status" id="deleteStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">等待操作</span>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- 脚本 -->
@@ -226,6 +239,48 @@ themeManager.clearSavedTheme();</code></pre>
           };
 
           renderer.renderFromPayload({ report: sampleReport });
+        });
+      }
+
+      // 删除报告
+      const deleteInput = document.getElementById('deleteReportIdInput');
+      const deleteButton = document.getElementById('deleteReportButton');
+      const deleteStatus = document.getElementById('deleteStatus');
+
+      function setDeleteStatus(type, text) {
+        if (!deleteStatus) return;
+        const dot = deleteStatus.querySelector('.status-dot');
+        const msg = deleteStatus.querySelector('.status-text');
+        if (dot) {
+          dot.classList.toggle('error', type === 'error');
+        }
+        if (msg) {
+          msg.textContent = text || '';
+        }
+      }
+
+      if (deleteButton && deleteInput) {
+        deleteButton.addEventListener('click', async () => {
+          const value = deleteInput.value.trim();
+          if (!value) {
+            alert('请输入要删除的报告 ID');
+            return;
+          }
+          const confirmed = confirm(`确定删除报告 ${value} 吗？此操作不可恢复。`);
+          if (!confirmed) return;
+
+          setDeleteStatus('loading', `正在删除：${value}`);
+          const deleteRequest = new Request(`删除报告:${value}`, `reports/${value}`);
+          try {
+            const resp = await deleteRequest.delete();
+            console.log('删除成功', resp.data);
+            setDeleteStatus('ready', `已删除：${value}`);
+            alert('删除成功');
+          } catch (error) {
+            console.error('删除失败', error);
+            setDeleteStatus('error', '删除失败，请检查控制台');
+            alert('删除失败，请查看控制台日志');
+          }
         });
       }
     });

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据库JSON测试</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="stylesheet" href="css/request-capsule.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>数据库JSON功能测试</h1>
+      <p>测试使用Tool包工具（HibernateUtil + JsonUtil）查询远程数据库并返回JSON</p>
+    </div>
+
+    <div class="card">
+      <h2>测试接口</h2>
+      <button class="button" id="testHibernateButton">查询 family_impact_analysis 表</button>
+      <div id="resultViewer" style="margin-top: 1rem; padding: 1rem; background-color: var(--bg-tertiary); border-radius: 6px; max-height: 500px; overflow: auto;">
+        <pre id="resultContent" style="margin: 0; color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word;">等待查询...</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 脚本 -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.9.0/axios.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/request.js"></script>
+  <script src="js/theme-manager.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const testButton = document.getElementById('testHibernateButton');
+      const resultContent = document.getElementById('resultContent');
+
+      if (testButton) {
+        testButton.addEventListener('click', async () => {
+          resultContent.textContent = '正在查询...';
+
+          // 使用前端Request模块调用后端API
+          const request = new Request('查询family_impact_analysis表', 'api/hibernate');
+
+          try {
+            const response = await request.get();
+
+            // 格式化显示JSON结果
+            const jsonStr = JSON.stringify(response.data, null, 2);
+            resultContent.textContent = jsonStr;
+
+            console.log('查询成功:', response.data);
+
+          } catch (error) {
+            resultContent.textContent = '查询失败: ' + error.message;
+            console.error('查询失败:', error);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

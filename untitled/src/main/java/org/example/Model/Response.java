@@ -1,4 +1,4 @@
-package org.example.model;
+package org.example.Model;
 
 public class Response<T> {
     private int code;

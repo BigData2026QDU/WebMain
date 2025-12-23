@@ -1,8 +1,8 @@
-package org.example.servlet;
+package org.example.Servlet;
 
 import org.example.Tool.HibernateUtil;
 import org.example.Tool.JsonUtil;
-import org.example.model.Response;
+import org.example.Model.Response;
 import org.hibernate.query.NativeQuery;
 
 import javax.servlet.ServletException;

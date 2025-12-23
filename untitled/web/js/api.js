@@ -4,7 +4,7 @@
     return;
   }
 
-  const BASE_URL = 'http://localhost:8080/untitled_war_exploded/'; // Placeholder for your server's domain/IP
+  const BASE_URL = 'http://localhost:1591/untitled_war/'; // Placeholder for your server's domain/IP
   let activeRequests = 0;
   const requestQueue = [];
   const MAX_DISPLAYED_REQUESTS = 3;

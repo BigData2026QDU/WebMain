@@ -17,7 +17,7 @@
     <!-- Login Servlet -->
     <servlet>
         <servlet-name>LoginServlet</servlet-name>
-        <servlet-class>org.example.servlet.LoginServlet</servlet-class>
+        <servlet-class>org.example.Servlet.LoginServlet</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>LoginServlet</servlet-name>
@@ -27,32 +27,13 @@
     <!-- Register Servlet -->
     <servlet>
         <servlet-name>RegisterServlet</servlet-name>
-        <servlet-class>org.example.servlet.RegisterServlet</servlet-class>
+        <servlet-class>org.example.Servlet.RegisterServlet</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>RegisterServlet</servlet-name>
         <url-pattern>/register</url-pattern>
     </servlet-mapping>
 
-    <!-- JSON测试Servlet -->
-    <servlet>
-        <servlet-name>TestServlet</servlet-name>
-        <servlet-class>org.example.Servlet.TestServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>TestServlet</servlet-name>
-        <url-pattern>/api/test</url-pattern>
-    </servlet-mapping>
-
-    <!-- 数据库测试Servlet -->
-    <servlet>
-        <servlet-name>DatabaseTestServlet</servlet-name>
-        <servlet-class>org.example.Servlet.DatabaseTestServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>DatabaseTestServlet</servlet-name>
-        <url-pattern>/api/db</url-pattern>
-    </servlet-mapping>
 
     <!-- Hibernate测试Servlet -->
     <servlet>

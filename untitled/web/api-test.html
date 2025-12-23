@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Test Console</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="stylesheet" href="css/request-capsule.css">
+  <style>
+    .test-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .test-textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      font-family: "Courier New", monospace;
+    }
+
+    .response-viewer {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>API Test Console</h1>
+      <p>Use the built-in request wrapper to quickly test backend endpoints.</p>
+    </div>
+
+    <div class="card">
+      <h2>Request Builder</h2>
+      <div class="report-actions">
+        <input id="apiPathInput" class="input" placeholder="api/hibernate" />
+        <select id="methodSelect" class="input">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="DELETE">DELETE</option>
+        </select>
+        <button class="button" id="sendButton">Send</button>
+        <button class="button secondary" id="sampleButton">Load Sample</button>
+        <button class="button secondary" id="clearButton">Clear</button>
+        <div class="report-status" id="requestStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Idle</span>
+        </div>
+      </div>
+
+      <div class="test-grid">
+        <div class="report-section">
+          <div class="report-header">
+            <h3 class="report-title">Request Body (JSON)</h3>
+            <span class="report-badge">POST/PUT only</span>
+          </div>
+          <textarea id="payloadInput" class="input test-textarea" placeholder='{"limit":10}'></textarea>
+        </div>
+
+        <div class="report-section">
+          <div class="report-header">
+            <h3 class="report-title">Response</h3>
+            <span class="report-badge" id="responseMeta">--</span>
+          </div>
+          <pre id="responseViewer" class="response-viewer">Waiting for request...</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.9.0/axios.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/request.js"></script>
+  <script src="js/theme-manager.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const pathInput = document.getElementById('apiPathInput');
+      const methodSelect = document.getElementById('methodSelect');
+      const payloadInput = document.getElementById('payloadInput');
+      const sendButton = document.getElementById('sendButton');
+      const sampleButton = document.getElementById('sampleButton');
+      const clearButton = document.getElementById('clearButton');
+      const responseViewer = document.getElementById('responseViewer');
+      const responseMeta = document.getElementById('responseMeta');
+      const statusEl = document.getElementById('requestStatus');
+      const statusDot = statusEl.querySelector('.status-dot');
+      const statusText = statusEl.querySelector('.status-text');
+
+      function setStatus(text, type) {
+        statusText.textContent = text;
+        statusDot.classList.toggle('error', type === 'error');
+      }
+
+      function setResponse(content, meta) {
+        responseViewer.textContent = content;
+        responseMeta.textContent = meta || '--';
+      }
+
+      function normalizePath(value) {
+        return value.replace(/^\/+/, '');
+      }
+
+      function setSample() {
+        pathInput.value = 'api/hibernate';
+        methodSelect.value = 'GET';
+        payloadInput.value = '';
+      }
+
+      function clearAll() {
+        pathInput.value = '';
+        payloadInput.value = '';
+        methodSelect.value = 'GET';
+        setStatus('Idle', 'idle');
+        setResponse('Waiting for request...', '--');
+      }
+
+      async function sendRequest() {
+        const rawPath = pathInput.value.trim();
+        if (!rawPath) {
+          setStatus('Missing path', 'error');
+          return;
+        }
+
+        const method = methodSelect.value;
+        const apiPath = normalizePath(rawPath);
+        const requestName = `API ${method} ${apiPath}`;
+        const request = new Request(requestName, apiPath);
+
+        setStatus('Loading...', 'loading');
+        setResponse('Loading...', `${method} ...`);
+
+        try {
+          let response;
+          if (method === 'GET') {
+            response = await request.get();
+          } else if (method === 'DELETE') {
+            response = await request.delete();
+          } else {
+            const payloadText = payloadInput.value.trim();
+            let payload = {};
+            if (payloadText) {
+              payload = JSON.parse(payloadText);
+            }
+            response = method === 'POST'
+              ? await request.post(payload)
+              : await request.put(payload);
+          }
+
+          const data = response.data;
+          const body = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+          setResponse(body, `${method} ${response.status}`);
+          setStatus('Success', 'success');
+        } catch (error) {
+          const statusCode = error.response ? error.response.status : 'ERROR';
+          const payload = error.response ? error.response.data : error.message;
+          const body = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+          setResponse(body, `${method} ${statusCode}`);
+          setStatus('Failed', 'error');
+        }
+      }
+
+      if (sendButton) {
+        sendButton.addEventListener('click', sendRequest);
+      }
+
+      if (sampleButton) {
+        sampleButton.addEventListener('click', setSample);
+      }
+
+      if (clearButton) {
+        clearButton.addEventListener('click', clearAll);
+      }
+
+      setSample();
+    });
+  </script>
+</body>
+</html>

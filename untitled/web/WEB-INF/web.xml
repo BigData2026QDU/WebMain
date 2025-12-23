@@ -7,7 +7,7 @@
     <!-- JSON测试Servlet -->
     <servlet>
         <servlet-name>TestServlet</servlet-name>
-        <servlet-class>org.example.servlet.TestServlet</servlet-class>
+        <servlet-class>org.example.Servlet.TestServlet</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>TestServlet</servlet-name>
@@ -17,7 +17,7 @@
     <!-- 数据库测试Servlet -->
     <servlet>
         <servlet-name>DatabaseTestServlet</servlet-name>
-        <servlet-class>org.example.servlet.DatabaseTestServlet</servlet-class>
+        <servlet-class>org.example.Servlet.DatabaseTestServlet</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>DatabaseTestServlet</servlet-name>
@@ -27,11 +27,21 @@
     <!-- Hibernate测试Servlet -->
     <servlet>
         <servlet-name>HibernateTestServlet</servlet-name>
-        <servlet-class>org.example.servlet.HibernateTestServlet</servlet-class>
+        <servlet-class>org.example.Servlet.HibernateTestServlet</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>HibernateTestServlet</servlet-name>
         <url-pattern>/api/hibernate</url-pattern>
+    </servlet-mapping>
+
+    <!-- 图表数据Servlet -->
+    <servlet>
+        <servlet-name>ChartDataServlet</servlet-name>
+        <servlet-class>org.example.Servlet.ChartDataServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ChartDataServlet</servlet-name>
+        <url-pattern>/api/chart/family-impact</url-pattern>
     </servlet-mapping>
 
 </web-app>

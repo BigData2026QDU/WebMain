@@ -1,7 +1,7 @@
 /**
  * ReportRenderer - 报告渲染器
  * 用于渲染包含文本、指标、图表的完整报告
- * 版本: 3.0 - 集成新图表渲染系统
+ * 版本: 4.0 - 仅支持新图表格式（columns/rows）
  */
 (function() {
   'use strict';
@@ -405,31 +405,45 @@
       const chartBlock = document.createElement('div');
       chartBlock.className = 'chart-block';
 
+      // 创建标题和控制栏容器
+      const headerRow = document.createElement('div');
+      headerRow.className = 'chart-header';
+
       if (chart.title) {
         const title = document.createElement('div');
         title.className = 'chart-title';
         title.textContent = chart.title;
-        chartBlock.appendChild(title);
+        headerRow.appendChild(title);
       }
+
+      // 创建图表类型选择器
+      const typeSelector = this.buildChartTypeSelector(chart);
+      headerRow.appendChild(typeSelector);
+
+      chartBlock.appendChild(headerRow);
 
       const canvas = document.createElement('div');
       canvas.className = 'chart-canvas';
       canvas.style.height = chart.height || '400px';
       chartBlock.appendChild(canvas);
 
+      // 延迟初始化图表，等待DOM渲染完成
       if (window.echarts) {
-        try {
-          const instance = echarts.init(canvas);
-          const option = this.buildChartOption(chart);
-          instance.setOption(option);
-          this.chartInstances.push({ instance, chart });
-        } catch (error) {
-          console.error('图表渲染失败:', error);
-          const errorMsg = document.createElement('div');
-          errorMsg.className = 'empty-state';
-          errorMsg.textContent = `图表渲染失败: ${error.message}`;
-          chartBlock.appendChild(errorMsg);
-        }
+        setTimeout(() => {
+          try {
+            const instance = echarts.init(canvas);
+            const option = this.buildChartOption(chart);
+            instance.setOption(option);
+            this.chartInstances.push({ instance, chart, canvas, typeSelector });
+          } catch (error) {
+            console.error('图表渲染失败:', error);
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'empty-state';
+            errorMsg.textContent = `图表渲染失败: ${error.message}`;
+            canvas.innerHTML = '';
+            canvas.appendChild(errorMsg);
+          }
+        }, 0);
       } else {
         const fallback = document.createElement('div');
         fallback.className = 'empty-state';
@@ -441,104 +455,112 @@
     }
 
     /**
-     * 构建图表配置（支持新旧格式）
+     * 构建图表类型选择器
      */
-    buildChartOption(chart) {
-      const colors = this.getThemeColors();
+    buildChartTypeSelector(chart) {
+      const selectorWrapper = document.createElement('div');
+      selectorWrapper.className = 'chart-type-selector';
 
-      // 检测是否为新格式：{ chartType, columns, rows, config }
-      if (chart.columns && chart.rows) {
-        // 使用新的图表渲染系统
-        const chartType = chart.chartType || 'bar';
-        const config = chart.config || {};
+      const label = document.createElement('label');
+      label.textContent = '图表类型：';
+      label.className = 'selector-label';
+      selectorWrapper.appendChild(label);
 
-        // 验证数据格式
-        const validation = window.ChartParser.validate(chart);
-        if (!validation.valid) {
-          throw new Error(`图表数据验证失败: ${validation.errors.join(', ')}`);
+      const select = document.createElement('select');
+      select.className = 'selector-dropdown';
+
+      // 获取支持的图表类型
+      const supportedTypes = window.ChartFactory.getSupportedTypes();
+      const currentType = chart.chartType || 'bar';
+
+      supportedTypes.forEach(typeInfo => {
+        const option = document.createElement('option');
+        option.value = typeInfo.type;
+        option.textContent = typeInfo.name;
+        option.title = typeInfo.description;
+        if (typeInfo.type === currentType) {
+          option.selected = true;
         }
+        select.appendChild(option);
+      });
 
-        // 解析数据
-        let parsedData;
-        if (chartType === 'pie') {
-          parsedData = window.ChartParser.parsePie(chart, config);
-        } else if (chartType === 'scatter') {
-          parsedData = window.ChartParser.parseScatter(chart, config);
-        } else {
-          parsedData = window.ChartParser.parse(chart, config);
-        }
+      // 绑定切换事件
+      select.addEventListener('change', (e) => {
+        const newType = e.target.value;
+        this.switchChartType(chart, newType);
+      });
 
-        // 生成图表配置
-        const chartOptions = config.chartOptions || {};
-        return window.ChartFactory.create(chartType, parsedData, colors, chartOptions);
-      }
-
-      // 兼容旧格式：{ data: [{ label, value }] }
-      if (chart.data && Array.isArray(chart.data)) {
-        console.warn('使用了旧的图表数据格式，建议迁移到新的 columns/rows 格式');
-        return this.buildLegacyChartOption(chart, colors);
-      }
-
-      throw new Error('图表数据格式不正确，需要 columns+rows 或 data 格式');
+      selectorWrapper.appendChild(select);
+      return selectorWrapper;
     }
 
     /**
-     * 兼容旧数据格式的图表配置生成
+     * 切换图表类型
      */
-    buildLegacyChartOption(chart, colors) {
-      const labels = (chart.data || []).map(item => item.label || '项');
-      const values = (chart.data || []).map(item => item.value || 0);
+    switchChartType(chart, newType) {
+      // 更新图表配置
+      chart.chartType = newType;
 
-      return {
-        backgroundColor: colors.bgPrimary,
-        color: colors.seriesColors,
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: { type: 'shadow' },
-          textStyle: { color: colors.textPrimary },
-          backgroundColor: colors.bgSecondary,
-          borderColor: colors.border
-        },
-        grid: {
-          left: 12,
-          right: 12,
-          top: 24,
-          bottom: 24,
-          containLabel: true
-        },
-        xAxis: {
-          type: 'value',
-          axisLabel: { color: colors.textSecondary },
-          axisLine: { lineStyle: { color: colors.border } },
-          splitLine: { lineStyle: { color: colors.border } }
-        },
-        yAxis: {
-          type: 'category',
-          data: labels,
-          axisLabel: { color: colors.textPrimary },
-          axisLine: { lineStyle: { color: colors.border } },
-          axisTick: { show: false }
-        },
-        series: [
-          {
-            type: 'bar',
-            data: values,
-            barWidth: '50%',
-            itemStyle: {
-              borderRadius: [0, 6, 6, 0]
-            },
-            label: {
-              show: true,
-              position: 'right',
-              color: colors.textPrimary
-            }
+      // 查找对应的图表实例
+      const chartInfo = this.chartInstances.find(item => item.chart === chart);
+      if (!chartInfo) {
+        console.error('未找到对应的图表实例');
+        return;
+      }
+
+      try {
+        // 重新构建图表配置
+        const option = this.buildChartOption(chart);
+
+        // 更新图表（使用notMerge=true完全替换配置）
+        chartInfo.instance.setOption(option, true);
+      } catch (error) {
+        console.error('图表切换失败:', error);
+
+        // 显示错误提示
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'chart-error-tip';
+        errorMsg.textContent = `切换失败: ${error.message}`;
+        errorMsg.style.cssText = 'color: #ef4444; padding: 8px; background: #fee; border-radius: 4px; margin-top: 8px;';
+
+        chartInfo.canvas.parentNode.insertBefore(errorMsg, chartInfo.canvas);
+
+        // 3秒后移除错误提示
+        setTimeout(() => {
+          if (errorMsg.parentNode) {
+            errorMsg.parentNode.removeChild(errorMsg);
           }
-        ],
-        textStyle: {
-          color: colors.textPrimary,
-          fontFamily: 'inherit'
-        }
-      };
+        }, 3000);
+      }
+    }
+
+    /**
+     * 构建图表配置（仅支持新格式）
+     */
+    buildChartOption(chart) {
+      const colors = this.getThemeColors();
+      const chartType = chart.chartType || 'bar';
+      const config = chart.config || {};
+
+      // 验证数据格式
+      const validation = window.ChartParser.validate(chart);
+      if (!validation.valid) {
+        throw new Error(`图表数据验证失败: ${validation.errors.join(', ')}`);
+      }
+
+      // 解析数据
+      let parsedData;
+      if (chartType === 'pie') {
+        parsedData = window.ChartParser.parsePie(chart, config);
+      } else if (chartType === 'scatter') {
+        parsedData = window.ChartParser.parseScatter(chart, config);
+      } else {
+        parsedData = window.ChartParser.parse(chart, config);
+      }
+
+      // 生成图表配置
+      const chartOptions = config.chartOptions || {};
+      return window.ChartFactory.create(chartType, parsedData, colors, chartOptions);
     }
 
     /**

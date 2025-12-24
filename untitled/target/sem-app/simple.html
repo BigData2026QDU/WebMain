@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>前端模块示例 - 自动主题切换</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="stylesheet" href="css/request-capsule.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>极简使用示例</h1>
+      <p>这个页面只引入了一份 JS 文件，无需编写任何 JavaScript 代码即可完成日间/夜间主题切换。</p>
+      <p>主题会根据时间自动切换，右上角的按钮也会自动生成。</p>
+    </div>
+
+    <div class="card">
+      <h2>使用方法</h2>
+      <p>在 HTML 中引入主题管理器即可：</p>
+      <div class="theme-info">
+        <pre><code>&lt;script src="js/theme-manager.js"&gt;&lt;/script&gt;</code></pre>
+      </div>
+      <p>无需编写额外代码。</p>
+    </div>
+
+    <div class="card">
+      <h2>自定义配置（可选）</h2>
+      <p>通过 data 属性传递配置：</p>
+      <div class="theme-info">
+        <pre><code>&lt;script 
+  src="js/theme-manager.js"
+  data-day-start="7"
+  data-night-start="19"
+  data-interval="30000"
+&gt;&lt;/script&gt;</code></pre>
+      </div>
+      <h3>可用配置项：</h3>
+      <ul>
+        <li><code>data-day-start</code> - 日间模式开始时间（小时，默认 6）</li>
+        <li><code>data-night-start</code> - 夜间模式开始时间（小时，默认 18）</li>
+        <li><code>data-interval</code> - 自动检测间隔（毫秒，默认 60000）</li>
+        <li><code>data-storage-key</code> - localStorage 键名（默认 'theme-preference'）</li>
+        <li><code>data-manual-override</code> - 是否允许手动覆盖（默认 true）</li>
+        <li><code>data-auto-init</code> - 是否自动初始化（默认 true）</li>
+        <li><code>data-auto-button</code> - 是否自动创建按钮（默认 true）</li>
+        <li><code>data-button-selector</code> - 自定义按钮选择器（可选）</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>高级用法</h2>
+      <p>如需通过 JS 控制主题，可访问全局 <code>window.themeManager</code> 对象：</p>
+      <div class="theme-info">
+        <pre><code>// 获取当前主题
+console.log(themeManager.getCurrentTheme());
+
+// 手动切换主题
+themeManager.toggleTheme();
+
+// 设置特定主题
+themeManager.setTheme('night');
+
+// 清除保存的偏好，恢复自动模式
+themeManager.clearSavedTheme();</code></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>使用自定义按钮</h2>
+      <p>如果你想使用自定义按钮，而不是自动生成的按钮：</p>
+      <div class="theme-info">
+        <pre><code>&lt;button id="myThemeButton"&gt;切换主题&lt;/button&gt;
+
+&lt;script 
+  src="js/theme-manager.js"
+  data-button-selector="#myThemeButton"
+&gt;&lt;/script&gt;</code></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>前后端通信演示</h2>
+      <p>点击按钮，模拟一次 API 请求。请求状态将显示在右下角的胶囊中。</p>
+      <button id="testApiRequestButton" class="button">发起测试请求</button>
+      <button id="testApiErrorButton" class="button">发起错误请求</button>
+    </div>
+
+    <div class="card">
+      <h2>报告渲染解码器</h2>
+      <p>从服务器获取编码的报告内容，解码后动态渲染文字、指标、图表，全程使用预定义的主题颜色。</p>
+      <div class="report-actions">
+        <input id="reportIdInput" class="input" placeholder="输入报告 ID（bindex），例如 1" />
+        <button class="button" id="loadReportButton">加载报告</button>
+        <button class="button secondary" id="loadSampleReportButton">加载报告示例</button>
+        <div class="report-status" id="reportStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">等待加载</span>
+        </div>
+      </div>
+      <div id="reportViewer" class="report-viewer"></div>
+    </div>
+
+
+  </div>
+
+  <!-- 脚本 -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/6.0.0/echarts.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.9.0/axios.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/request.js"></script>
+  <script src="js/chart-parser.js"></script>
+  <script src="js/chart-factory.js"></script>
+  <script src="js/report-renderer.js"></script>
+  <script src="js/theme-manager.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const testRequestButton = document.getElementById('testApiRequestButton');
+      if (testRequestButton) {
+        testRequestButton.addEventListener('click', async () => {
+          const myRequest = new Request('获取用户列表', 'users');
+          try {
+            const response = await myRequest.get();
+            console.log('请求成功:', response.data);
+            alert('请求成功！请查看控制台。');
+          } catch (error) {
+            console.error('请求失败:', error);
+            alert('请求失败！请查看控制台。');
+          }
+        });
+      }
+
+      const testErrorButton = document.getElementById('testApiErrorButton');
+      if (testErrorButton) {
+        testErrorButton.addEventListener('click', async () => {
+          const myErrorRequest = new Request('获取不存在的数据', 'nonexistent');
+          try {
+            const response = await myErrorRequest.get();
+            console.log('请求成功:', response.data);
+          } catch (error) {
+            console.error('请求失败:', error);
+            alert('请求失败！请查看控制台。');
+          }
+        });
+      }
+
+      // 报告解析器
+      const reportViewer = document.getElementById('reportViewer');
+      const reportStatus = document.getElementById('reportStatus');
+      const renderer = new ReportRenderer({
+        container: reportViewer,
+        statusElement: reportStatus,
+        requestFactory: (reportId) => new Request(`加载报告:${reportId}`, `reports/${reportId}`)
+      });
+
+      const loadButton = document.getElementById('loadReportButton');
+      const input = document.getElementById('reportIdInput');
+      const sampleButton = document.getElementById('loadSampleReportButton');
+
+      if (loadButton && input) {
+        loadButton.addEventListener('click', () => {
+          const value = input.value.trim();
+          if (!value) {
+            alert('请输入报告 ID');
+            return;
+          }
+          renderer.load(value);
+        });
+      }
+
+      if (sampleButton) {
+        sampleButton.addEventListener('click', () => {
+          const sampleReport = {
+            title: '大数据报告示例（新格式）',
+            tag: 'online',
+            updatedAt: '2025-12-03 12:00',
+            source: '日志汇总 + 底层统计',
+            summary: '报告仅包含基本信息 + sections 内容块（type/data）。',
+            sections: [
+              {
+                type: 'text',
+                data: '平均响应时间明显下降，对客户终端品牌感知有改善。'
+              },
+              {
+                type: 'text',
+                data: '现网协助率增长 8%，与本次现网策略调优直接相关。'
+              },
+              {
+                type: 'chart',
+                data: {
+                  title: '核心 API 响应时间 (ms)',
+                  columns: ['接口', '耗时(ms)'],
+                  rows: [
+                    ['/auth/login', 120],
+                    ['/report/export', 240],
+                    ['/metrics/top', 180],
+                    ['/user/profile', 90]
+                  ]
+                }
+              }
+            ]
+          };
+
+          renderer.renderFromPayload({ report: sampleReport });
+        });
+      }
+
+    });
+  </script>
+</body>
+</html>

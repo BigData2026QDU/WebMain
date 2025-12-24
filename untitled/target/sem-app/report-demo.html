@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大数据分析平台 - 2024 Q4 季度报告</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="stylesheet" href="css/request-capsule.css">
+  <style>
+    .demo-header {
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+    }
+    .demo-header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+      font-weight: 800;
+    }
+    .demo-header p {
+      margin: 0.5rem 0 0;
+      font-size: 1.1rem;
+      opacity: 0.95;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="demo-header">
+      <h1>大数据分析平台季度报告</h1>
+      <p>2024年第四季度运营与技术分析报告</p>
+    </div>
+
+    <div id="reportViewer" class="report-viewer"></div>
+  </div>
+
+  <!-- 依赖库 -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/6.0.0/echarts.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/axios/1.9.0/axios.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/request.js"></script>
+  <script src="js/chart-parser.js"></script>
+  <script src="js/chart-factory.js"></script>
+  <script src="js/report-renderer.js"></script>
+  <script src="js/theme-manager.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const reportViewer = document.getElementById('reportViewer');
+      const renderer = new ReportRenderer({
+        container: reportViewer
+      });
+
+      // 季度报告数据
+      const quarterlyReportLegacy = {
+        title: '大数据分析平台 Q4 季度运营报告',
+        tag: '季度报告',
+        updatedAt: '2024-12-24',
+        source: '平台运营中心',
+        range: '2024年10月-12月',
+        summary: '本季度平台整体表现优异，用户规模突破50万，日活跃用户增长35%，数据处理量创历史新高。通过技术优化和功能迭代，平台稳定性和用户体验显著提升，为明年发展奠定坚实基础。',
+
+        // 关键指标
+        metrics: [
+          {
+            label: '总用户数',
+            value: '52.8万',
+            trend: '+15.2万 (↑40%)',
+            note: '较上季度增长40%，超额完成目标'
+          },
+          {
+            label: '日活跃用户',
+            value: '8.5万',
+            trend: '+2.2万 (↑35%)',
+            note: 'DAU持续增长，用户粘性增强'
+          },
+          {
+            label: '数据处理量',
+            value: '1.2PB',
+            trend: '+420TB (↑53%)',
+            note: '单日峰值处理达45TB'
+          },
+          {
+            label: '系统可用性',
+            value: '99.97%',
+            trend: '+0.12% (↑)',
+            note: '故障时长降低65%'
+          },
+          {
+            label: '平均响应时间',
+            value: '285ms',
+            trend: '-98ms (↓26%)',
+            note: '查询性能大幅提升'
+          },
+          {
+            label: '用户满意度',
+            value: '4.6/5.0',
+            trend: '+0.3分 (↑7%)',
+            note: 'NPS得分提升至68'
+          }
+        ],
+
+        // 内容章节
+        sections: [
+          {
+            title: '一、用户增长与活跃度分析',
+            paragraphs: [
+              '本季度用户增长呈现加速态势，总用户数突破52万，较上季度增长40%。其中，企业用户占比达35%，个人用户占65%。新用户主要来源于产品推荐（42%）、搜索引擎（28%）和合作伙伴渠道（18%）。',
+              '日活跃用户（DAU）稳步攀升，从10月的6.8万增长至12月的8.5万，增幅35%。用户留存率显著改善：次日留存从62%提升至71%，7日留存从38%提升至45%，30日留存从22%提升至28%。这表明产品功能优化和用户体验改进取得显著成效。'
+            ]
+          },
+          {
+            title: '二、数据处理与系统性能',
+            paragraphs: [
+              '数据处理能力实现突破性增长。本季度累计处理数据1.2PB，较上季度增长53%。单日峰值处理量达45TB（11月11日），系统架构经受住了高并发考验。数据处理类型分布：实时流处理占38%，批量分析占42%，机器学习任务占20%。',
+              '系统性能全面优化。通过引入分布式缓存、查询优化和负载均衡策略，平均响应时间从383ms降至285ms，降幅26%。P95响应时间从1.2秒优化至680ms，P99响应时间从2.8秒优化至1.5秒。并发处理能力从8000 QPS提升至12000 QPS。'
+            ]
+          },
+          {
+            title: '三、核心功能迭代',
+            paragraphs: [
+              '本季度完成三次重要版本发布，累计上线新功能28项，优化改进65处。主要功能亮点包括：'
+            ],
+            orderedList: [
+              '智能数据分析助手：基于GPT-4的自然语言查询功能，使非技术用户也能轻松完成复杂数据分析',
+              '实时数据看板：支持自定义指标、多维度下钻、告警配置，用户使用率达72%',
+              '协作工作区：团队成员可共享数据集、分析报告和可视化图表，企业用户好评如潮',
+              '数据血缘追踪：完整记录数据处理链路，支持合规审计和问题溯源',
+              'API开放平台：提供RESTful API和SDK，已有120+企业接入'
+            ]
+          },
+          {
+            title: '四、技术架构优化',
+            paragraphs: [
+              '技术团队在架构稳定性和可扩展性方面取得显著进展。主要技术改进包括：'
+            ],
+            list: [
+              '微服务拆分：将单体应用拆分为15个独立微服务，部署灵活性提升80%',
+              '容器化改造：完成100%服务容器化，基于Kubernetes实现自动扩缩容',
+              '数据库优化：引入PostgreSQL分区表和TimescaleDB，查询性能提升3-5倍',
+              '缓存策略：多级缓存架构（本地缓存+Redis+CDN），缓存命中率达89%',
+              '监控告警：接入Prometheus+Grafana，实现全链路可观测性'
+            ]
+          },
+          {
+            title: '五、安全与合规',
+            paragraphs: [
+              '安全是平台的生命线。本季度通过ISO 27001和SOC 2 Type II认证，获得公安部等保三级资质。实施的安全措施包括：数据传输全程TLS 1.3加密、存储数据AES-256加密、定期安全审计和渗透测试、用户操作审计日志、GDPR和CCPA合规性保障。',
+              '未发生任何重大安全事件，成功拦截DDoS攻击27次，识别并阻止异常登录尝试1200+次。'
+            ]
+          },
+          {
+            title: '六、用户反馈与改进',
+            paragraphs: [
+              '本季度收集用户反馈1850条，问题解决率92%，平均响应时间4.2小时。用户最关注的三个问题：查询速度优化（已改进）、移动端体验（12月上线）、数据导出格式（已支持10+格式）。',
+              '用户满意度调查显示：功能丰富度4.5/5、系统稳定性4.7/5、界面易用性4.4/5、客户服务4.6/5。NPS（净推荐值）从54提升至68，超过行业平均水平。'
+            ]
+          },
+          {
+            title: '七、下季度规划',
+            paragraphs: [
+              '基于本季度成果和用户需求，下季度工作重点：'
+            ],
+            orderedList: [
+              'AI驱动的数据洞察：推出智能异常检测、趋势预测和推荐引擎',
+              '移动端原生应用：iOS和Android客户端上线，支持离线查看',
+              '数据市场：建立数据集交易平台，促进数据资产流通',
+              '国际化扩展：支持英语、日语、韩语，拓展海外市场',
+              '性能再优化：目标响应时间<200ms，并发处理能力达20000 QPS'
+            ]
+          },
+          {
+            title: '八、技术栈说明',
+            paragraphs: [
+              '当前平台采用的核心技术栈：'
+            ],
+            code: `// 后端技术栈
+Java 17 + Spring Boot 3.2
+PostgreSQL 15 + TimescaleDB
+Redis 7.0 (缓存/消息队列)
+Kafka 3.5 (事件流)
+Elasticsearch 8.x (日志/搜索)
+Kubernetes 1.28 (容器编排)
+
+// 前端技术栈
+Vue 3 + TypeScript
+ECharts 5.x (可视化)
+TailwindCSS (样式)
+Vite (构建工具)
+
+// 数据处理
+Apache Spark 3.5
+Apache Flink 1.18
+dbt (数据转换)`
+          },
+          {
+            title: '九、团队与文化',
+            paragraphs: [
+              '团队规模从38人扩展至52人，新增数据科学家3名、后端工程师5名、产品经理2名、设计师1名。本季度完成技术分享会12场，开源贡献代码3200+行，发表技术博客8篇。'
+            ],
+            quote: '数据驱动决策，技术创造价值。我们致力于打造业界领先的大数据分析平台，让每个人都能从数据中获得洞察。 —— 产品愿景'
+          }
+        ],
+
+        // 可视化图表
+        charts: [
+          {
+            title: '用户增长趋势（双Y轴：用户数 vs 增长率）',
+            chartType: 'line',
+            columns: ['月份', '总用户数 (万)', '新增用户 (万)', '增长率 (%)'],
+            rows: [
+              ['7月', 28.5, 3.2, 12.7],
+              ['8月', 31.2, 2.7, 9.5],
+              ['9月', 34.6, 3.4, 10.9],
+              ['10月', 38.8, 4.2, 12.1],
+              ['11月', 44.5, 5.7, 14.7],
+              ['12月', 52.8, 8.3, 18.7]
+            ],
+            config: {
+              xAxisColumn: 0,
+              chartOptions: {
+                smooth: true,
+                area: true,
+                dualAxis: true,
+                leftAxisColumns: [1, 2],
+                rightAxisColumns: [3]
+              }
+            },
+            height: '450px'
+          },
+          {
+            title: '数据处理量分布（饼图）',
+            chartType: 'pie',
+            columns: ['处理类型', '数据量 (TB)'],
+            rows: [
+              ['实时流处理', 456],
+              ['批量分析', 504],
+              ['机器学习训练', 180],
+              ['数据同步', 60]
+            ],
+            config: {
+              labelColumn: 0,
+              valueColumn: 1,
+              chartOptions: {
+                showPercentage: true
+              }
+            },
+            height: '400px'
+          },
+          {
+            title: '系统性能指标对比（优化前 vs 优化后）',
+            chartType: 'bar',
+            columns: ['指标', '优化前', '优化后', '改善幅度 (%)'],
+            rows: [
+              ['平均响应时间 (ms)', 383, 285, 25.6],
+              ['P95响应时间 (ms)', 1200, 680, 43.3],
+              ['并发处理 (QPS)', 8000, 12000, 50.0],
+              ['缓存命中率 (%)', 72, 89, 23.6]
+            ],
+            config: {
+              xAxisColumn: 0,
+              chartOptions: {
+                orientation: 'vertical',
+                stack: false
+              }
+            },
+            height: '400px'
+          },
+          {
+            title: '用户来源渠道分析（横向柱状图）',
+            chartType: 'bar',
+            columns: ['渠道', '新增用户数 (万)'],
+            rows: [
+              ['产品推荐', 8.4],
+              ['搜索引擎', 5.6],
+              ['合作伙伴', 3.6],
+              ['社交媒体', 1.8],
+              ['广告投放', 1.2],
+              ['其他', 0.9]
+            ],
+            config: {
+              xAxisColumn: 0,
+              chartOptions: {
+                orientation: 'horizontal'
+              }
+            },
+            height: '350px'
+          },
+          {
+            title: '功能使用率 Top 10',
+            chartType: 'bar',
+            columns: ['功能模块', '使用率 (%)'],
+            rows: [
+              ['数据查询', 95],
+              ['可视化看板', 72],
+              ['报表生成', 68],
+              ['数据导出', 61],
+              ['智能分析', 58],
+              ['协作工作区', 52],
+              ['API调用', 45],
+              ['告警配置', 38],
+              ['数据血缘', 32],
+              ['权限管理', 28]
+            ],
+            config: {
+              xAxisColumn: 0,
+              chartOptions: {
+                orientation: 'horizontal'
+              }
+            },
+            height: '420px'
+          },
+          {
+            title: '日活跃用户与留存率趋势（混合图：柱状+折线）',
+            chartType: 'mix',
+            columns: ['周次', 'DAU (万)', '次日留存率 (%)', '7日留存率 (%)'],
+            rows: [
+              ['W1', 6.8, 62, 38],
+              ['W2', 7.0, 64, 39],
+              ['W3', 7.2, 65, 40],
+              ['W4', 7.4, 66, 41],
+              ['W5', 7.5, 67, 42],
+              ['W6', 7.7, 68, 43],
+              ['W7', 7.9, 69, 43],
+              ['W8', 8.0, 70, 44],
+              ['W9', 8.2, 70, 44],
+              ['W10', 8.3, 71, 45],
+              ['W11', 8.4, 71, 45],
+              ['W12', 8.5, 71, 45]
+            ],
+            config: {
+              xAxisColumn: 0,
+              chartOptions: {
+                barColumns: [1],
+                lineColumns: [2, 3],
+                smooth: true
+              }
+            },
+            height: '450px'
+          }
+        ],
+
+        // 附注
+        notes: [
+          '本报告数据来源：平台运营数据库、用户行为分析系统、系统监控平台',
+          '统计周期：2024年10月1日 00:00 至 2024年12月31日 23:59',
+          '报告编制：平台运营中心、技术研发中心、数据分析团队',
+          '如有疑问或建议，请联系：report@bigdata-platform.com',
+          '下一期报告预计发布时间：2025年4月初（Q1季度报告）'
+        ]
+      };
+
+      // 更简洁的新格式：仅保留基本信息 + sections(type/data)
+      const quarterlyReport = {
+        title: '大数据分析平台 Q4 季度运营报告（新格式）',
+        tag: '季度报告',
+        updatedAt: '2024-12-24',
+        source: '平台运营中心',
+        summary: '报告仅包含基本信息 + sections 内容块（type/data）。文本为纯文字段落，图表为 columns/rows 数据。',
+        sections: [
+          { type: 'text', data: '本季度用户增长呈现加速态势，总用户数突破52万，较上季度增长40%。' },
+          { type: 'text', data: '系统性能全面优化：平均响应时间从 383ms 降至 285ms，并发处理能力从 8000 QPS 提升至 12000 QPS。' },
+          {
+            type: 'chart',
+            data: {
+              title: '用户增长趋势（可自由切换图表类型）',
+              columns: ['月份', '总用户数(万)', '新增用户(万)'],
+              rows: [
+                ['7月', 28.5, 3.2],
+                ['8月', 31.2, 2.7],
+                ['9月', 34.6, 3.4],
+                ['10月', 38.8, 4.2],
+                ['11月', 44.5, 5.7],
+                ['12月', 52.8, 8.3]
+              ],
+              config: { xAxisColumn: 0 }
+            }
+          }
+        ]
+      };
+
+      // 渲染报告
+      renderer.renderFromPayload({ report: quarterlyReport });
+    });
+  </script>
+</body>
+</html>

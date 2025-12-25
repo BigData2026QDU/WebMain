@@ -45,4 +45,14 @@
         <url-pattern>/api/hibernate</url-pattern>
     </servlet-mapping>
 
+    <!-- Report Servlet -->
+    <servlet>
+        <servlet-name>ReportServlet</servlet-name>
+        <servlet-class>org.example.Servlet.ReportServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ReportServlet</servlet-name>
+        <url-pattern>/reports/*</url-pattern>
+    </servlet-mapping>
+
 </web-app>

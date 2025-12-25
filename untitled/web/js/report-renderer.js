@@ -1,7 +1,7 @@
 /**
  * ReportRenderer - 报告渲染器
- * 用于渲染包含文本、指标、图表的完整报告
- * 版本: 4.0 - 仅支持新图表格式（columns/rows）
+ * 用于渲染“简化报告协议”：基本信息 + sections(type/data) 内容块
+ * 版本: 5.0 - sections 驱动渲染（旧结构会被转换为内容块）
  */
 (function() {
   'use strict';
@@ -15,12 +15,10 @@
     console.error('ReportRenderer 依赖 ECharts，请在 report-renderer.js 之前引入 echarts.min.js。');
   }
   if (!window.ChartParser) {
-    console.error('ReportRenderer 依赖 ChartParser，请确认 chart-parser.js 已加载。');
-    return;
+    console.warn('ReportRenderer 未检测到 ChartParser（chart-parser.js）。纯文本报告仍可渲染，但图表功能不可用。');
   }
   if (!window.ChartFactory) {
-    console.error('ReportRenderer 依赖 ChartFactory，请确认 chart-factory.js 已加载。');
-    return;
+    console.warn('ReportRenderer 未检测到 ChartFactory（chart-factory.js）。纯文本报告仍可渲染，但图表功能不可用。');
   }
 
   class ReportRenderer {
@@ -84,6 +82,11 @@
         throw new Error('报告数据为空，无法解码。');
       }
 
+      // 兼容后端统一响应包装：{ code, message, data }
+      if (typeof payload === 'object' && payload !== null && 'code' in payload && 'data' in payload) {
+        payload = payload.data;
+      }
+
       // 支持 base64 编码的 JSON
       if (payload.base64) {
         try {
@@ -145,7 +148,7 @@
     }
 
     /**
-     * 渲染完整报告
+     * 渲染报告（优先使用简化协议：sections(type/data)）
      */
     renderReport(report) {
       if (!report) {
@@ -165,65 +168,172 @@
       header.appendChild(this.buildHeader(report));
       wrapper.appendChild(header);
 
-      // 2. 关键指标
-      if (Array.isArray(report.metrics) && report.metrics.length > 0) {
-        const metricsSection = document.createElement('div');
-        metricsSection.className = 'report-section';
-        const metricsTitle = document.createElement('h3');
-        metricsTitle.textContent = '关键指标';
-        metricsTitle.className = 'section-title';
-        metricsSection.appendChild(metricsTitle);
-
-        const metricGrid = document.createElement('div');
-        metricGrid.className = 'metric-grid';
-        report.metrics.forEach(metric => {
-          metricGrid.appendChild(this.buildMetricCard(metric));
-        });
-        metricsSection.appendChild(metricGrid);
-        wrapper.appendChild(metricsSection);
-      }
-
-      // 3. 文章内容段落
-      if (Array.isArray(report.sections) && report.sections.length > 0) {
-        report.sections.forEach(section => {
-          wrapper.appendChild(this.buildSection(section));
-        });
-      }
-
-      // 4. 图表可视化
-      if (Array.isArray(report.charts) && report.charts.length > 0) {
-        const chartSection = document.createElement('div');
-        chartSection.className = 'report-section';
-        const ct = document.createElement('h3');
-        ct.textContent = '数据可视化';
-        ct.className = 'section-title';
-        chartSection.appendChild(ct);
-
-        report.charts.forEach(chart => {
-          chartSection.appendChild(this.buildChart(chart));
-        });
-
-        wrapper.appendChild(chartSection);
-      }
-
-      // 5. 附注
-      if (Array.isArray(report.notes) && report.notes.length > 0) {
-        const notes = document.createElement('div');
-        notes.className = 'report-section notes-section';
-        const title = document.createElement('h3');
-        title.textContent = '附注';
-        title.className = 'section-title';
-        notes.appendChild(title);
-        report.notes.forEach(text => {
-          const p = document.createElement('p');
-          p.textContent = text;
-          p.className = 'note-text';
-          notes.appendChild(p);
-        });
-        wrapper.appendChild(notes);
+      // 2. 内容块：统一转为 [{type, data}] 再渲染（不再按旧结构渲染 metrics/notes 等复杂结构）
+      const blocks = this.normalizeToBlocks(report);
+      if (blocks.length > 0) {
+        blocks.forEach(block => wrapper.appendChild(this.buildBlock(block)));
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = '报告没有可渲染的 sections 内容。';
+        wrapper.appendChild(empty);
       }
 
       this.container.appendChild(wrapper);
+    }
+
+    /**
+     * 规范化：把任意历史结构转换为简化内容块数组
+     * 目标输出：[{ type: 'text'|'chart', data: ... }]
+     */
+    normalizeToBlocks(report) {
+      const blocks = [];
+
+      // 1) 优先：sections 已经是新协议
+      if (Array.isArray(report.sections)) {
+        const sections = report.sections;
+        const hasTyped = sections.some(s => s && typeof s === 'object' && typeof s.type === 'string');
+
+        if (hasTyped) {
+          sections.forEach(s => {
+            if (!s || typeof s !== 'object') return;
+            blocks.push({ type: s.type, data: s.data });
+          });
+          return blocks;
+        }
+
+        // 2) 兼容：sections 如果是字符串数组，当作纯文本段落数组
+        const allStrings = sections.every(s => typeof s === 'string');
+        if (allStrings) {
+          sections.forEach(text => blocks.push({ type: 'text', data: text }));
+          return blocks;
+        }
+
+        // 3) 兼容：旧 section 结构（title/paragraphs/list/...），降级为纯文本块
+        sections.forEach(section => {
+          if (!section || typeof section !== 'object') return;
+          const lines = [];
+          if (section.title) lines.push(String(section.title));
+
+          if (Array.isArray(section.paragraphs)) {
+            section.paragraphs.forEach(p => {
+              if (p != null && String(p).trim() !== '') lines.push(String(p));
+            });
+          }
+          if (Array.isArray(section.list)) {
+            section.list.forEach(item => {
+              if (item != null && String(item).trim() !== '') lines.push(String(item));
+            });
+          }
+          if (Array.isArray(section.orderedList)) {
+            section.orderedList.forEach(item => {
+              if (item != null && String(item).trim() !== '') lines.push(String(item));
+            });
+          }
+          if (section.code) lines.push(String(section.code));
+          if (section.quote) lines.push(String(section.quote));
+
+          lines.forEach(t => blocks.push({ type: 'text', data: t }));
+        });
+      }
+
+      // 4) 兼容：旧字段 charts，转为 chart block（保持你要求的“只用 sections”渲染逻辑）
+      if (Array.isArray(report.charts)) {
+        report.charts.forEach(chart => {
+          if (!chart || typeof chart !== 'object') return;
+          blocks.push({ type: 'chart', data: chart });
+        });
+      }
+
+      // 5) 兼容：notes 降级为纯文本段落
+      if (Array.isArray(report.notes)) {
+        report.notes.forEach(t => {
+          if (t != null && String(t).trim() !== '') blocks.push({ type: 'text', data: String(t) });
+        });
+      }
+
+      // 6) 兼容：metrics 降级为纯文本段落（避免旧接口直接空白）
+      if (Array.isArray(report.metrics)) {
+        report.metrics.forEach(m => {
+          if (!m || typeof m !== 'object') return;
+          const label = m.label != null ? String(m.label) : '指标';
+          const value = m.value != null ? String(m.value) : '-';
+          blocks.push({ type: 'text', data: `${label}: ${value}` });
+        });
+      }
+
+      return blocks;
+    }
+
+    /**
+     * 构建统一内容块：{ type: "text" | "chart", data: any }
+     */
+    buildBlock(block) {
+      const type = block && typeof block === 'object' ? String(block.type || '').toLowerCase() : '';
+      const data = block && typeof block === 'object' ? block.data : null;
+
+      if (type === 'text') {
+        return this.buildTextBlock(data);
+      }
+
+      if (type === 'chart') {
+        return this.buildChartBlock(data);
+      }
+
+      const fallback = document.createElement('div');
+      fallback.className = 'report-section content-section';
+      const p = document.createElement('p');
+      p.className = 'section-paragraph';
+      p.textContent = `未知内容块类型：${type || '(empty)'}，已跳过渲染。`;
+      fallback.appendChild(p);
+      return fallback;
+    }
+
+    buildTextBlock(data) {
+      const block = document.createElement('div');
+      block.className = 'report-section content-section';
+
+      const texts = Array.isArray(data) ? data : [data];
+      texts
+        .filter(t => t != null && String(t).trim() !== '')
+        .forEach(t => {
+          const p = document.createElement('p');
+          p.className = 'section-paragraph';
+          p.textContent = String(t);
+          block.appendChild(p);
+        });
+
+      if (!block.childNodes.length) {
+        const p = document.createElement('p');
+        p.className = 'section-paragraph';
+        p.textContent = '';
+        block.appendChild(p);
+      }
+
+      return block;
+    }
+
+    buildChartBlock(data) {
+      const block = document.createElement('div');
+      block.className = 'report-section';
+
+      // 兼容：允许 data = { charts: [...] } 或 data = { title, columns, rows, ... }
+      const charts = (data && typeof data === 'object' && Array.isArray(data.charts)) ? data.charts : [data];
+
+      charts
+        .filter(c => c && typeof c === 'object')
+        .forEach(chart => {
+          block.appendChild(this.buildChart(chart));
+        });
+
+      if (!block.childNodes.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = '图表数据为空，无法渲染。';
+        block.appendChild(empty);
+      }
+
+      return block;
     }
 
     /**
@@ -418,7 +528,9 @@
 
       // 创建图表类型选择器
       const typeSelector = this.buildChartTypeSelector(chart);
-      headerRow.appendChild(typeSelector);
+      if (typeSelector) {
+        headerRow.appendChild(typeSelector);
+      }
 
       chartBlock.appendChild(headerRow);
 
@@ -458,6 +570,9 @@
      * 构建图表类型选择器
      */
     buildChartTypeSelector(chart) {
+      if (!window.ChartFactory || !window.ChartFactory.getSupportedTypes) {
+        return null;
+      }
       const selectorWrapper = document.createElement('div');
       selectorWrapper.className = 'chart-type-selector';
 
@@ -538,6 +653,10 @@
      * 构建图表配置（仅支持新格式）
      */
     buildChartOption(chart) {
+      if (!window.ChartParser || !window.ChartFactory) {
+        throw new Error('图表模块未加载（ChartParser/ChartFactory 缺失），无法渲染图表。');
+      }
+
       const colors = this.getThemeColors();
       const chartType = chart.chartType || 'bar';
       const config = chart.config || {};

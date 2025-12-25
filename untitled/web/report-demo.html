@@ -56,7 +56,7 @@
       });
 
       // 季度报告数据
-      const quarterlyReport = {
+      const quarterlyReportLegacy = {
         title: '大数据分析平台 Q4 季度运营报告',
         tag: '季度报告',
         updatedAt: '2024-12-24',
@@ -351,6 +351,35 @@ dbt (数据转换)`
           '报告编制：平台运营中心、技术研发中心、数据分析团队',
           '如有疑问或建议，请联系：report@bigdata-platform.com',
           '下一期报告预计发布时间：2025年4月初（Q1季度报告）'
+        ]
+      };
+
+      // 更简洁的新格式：仅保留基本信息 + sections(type/data)
+      const quarterlyReport = {
+        title: '大数据分析平台 Q4 季度运营报告（新格式）',
+        tag: '季度报告',
+        updatedAt: '2024-12-24',
+        source: '平台运营中心',
+        summary: '报告仅包含基本信息 + sections 内容块（type/data）。文本为纯文字段落，图表为 columns/rows 数据。',
+        sections: [
+          { type: 'text', data: '本季度用户增长呈现加速态势，总用户数突破52万，较上季度增长40%。' },
+          { type: 'text', data: '系统性能全面优化：平均响应时间从 383ms 降至 285ms，并发处理能力从 8000 QPS 提升至 12000 QPS。' },
+          {
+            type: 'chart',
+            data: {
+              title: '用户增长趋势（可自由切换图表类型）',
+              columns: ['月份', '总用户数(万)', '新增用户(万)'],
+              rows: [
+                ['7月', 28.5, 3.2],
+                ['8月', 31.2, 2.7],
+                ['9月', 34.6, 3.4],
+                ['10月', 38.8, 4.2],
+                ['11月', 44.5, 5.7],
+                ['12月', 52.8, 8.3]
+              ],
+              config: { xAxisColumn: 0 }
+            }
+          }
         ]
       };
 

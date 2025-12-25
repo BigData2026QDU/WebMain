@@ -3,6 +3,7 @@ package org.example.Servlet;
 import org.example.Tool.JsonUtil;
 import org.example.User;
 import org.example.Model.Response;
+import org.example.pool.ServicePoolManager;
 import org.example.service.UserService;
 
 import javax.servlet.ServletException;
@@ -14,7 +15,7 @@ import java.io.IOException;
 
 public class LoginServlet extends HttpServlet {
 
-    private final UserService userService = new UserService();
+    private final ServicePoolManager poolManager = ServicePoolManager.getInstance();
 
     // Static nested DTO class for parsing the JSON request body.
     private static class LoginRequest {
@@ -44,6 +45,7 @@ public class LoginServlet extends HttpServlet {
         String requestBody = sb.toString();
         System.out.println("Login attempt with body: " + requestBody);
 
+        UserService userService = null;
         try {
             if (requestBody.trim().isEmpty()) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -55,6 +57,8 @@ public class LoginServlet extends HttpServlet {
             String username = loginRequest.getUsername();
             String password = loginRequest.getPassword();
 
+            // Borrow UserService from pool
+            userService = poolManager.borrowService(UserService.class);
             User user = userService.login(username, password);
 
             if (user != null) {
@@ -73,6 +77,11 @@ public class LoginServlet extends HttpServlet {
             e.printStackTrace();
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             JsonUtil.writeJsonResponse(resp, Response.error(HttpServletResponse.SC_BAD_REQUEST, "Invalid JSON format: " + e.getMessage()));
+        } finally {
+            // Always return service to pool
+            if (userService != null) {
+                poolManager.returnService(UserService.class, userService);
+            }
         }
     }
 }

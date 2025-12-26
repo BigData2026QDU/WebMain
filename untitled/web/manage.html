@@ -85,6 +85,59 @@
     .status-dot.error {
       background-color: var(--accent-secondary);
     }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .button.secondary {
+      background-color: transparent;
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .button.secondary:hover {
+      background-color: var(--bg-primary);
+    }
+
+    .report-list {
+      margin-top: 0.75rem;
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .report-item {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-primary);
+      cursor: pointer;
+    }
+
+    .report-item:hover {
+      border-color: var(--accent-secondary);
+    }
+
+    .report-id {
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .report-preview {
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .muted {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -101,13 +154,28 @@
       <h2>删除大数据报告</h2>
       <p>输入报告 ID，使用 `DELETE /reports/{id}` 删除。请求由封装的 Request 类发起，域名/IP 由 axios 封装统一维护。</p>
       <div class="form-row">
-        <input id="deleteId" class="input" placeholder="例如: daily-001" />
+        <input id="deleteId" class="input" placeholder="请输入 bindex，例如：1" />
         <button class="button" id="deleteBtn">删除</button>
       </div>
       <div class="status" id="deleteStatus">
         <span class="status-dot"></span>
         <span class="status-text">等待操作</span>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <div>
+          <h2 style="margin:0;">报告列表</h2>
+          <div class="muted">展示 bindex 与首段文本（点击一行会自动填充到上方删除框）。</div>
+        </div>
+        <button class="button secondary" id="refreshListBtn">刷新列表</button>
+      </div>
+      <div id="listStatus" class="status">
+        <span class="status-dot"></span>
+        <span class="status-text">等待加载</span>
+      </div>
+      <div id="reportList" class="report-list"></div>
     </div>
   </div>
 
@@ -127,6 +195,9 @@
       const deleteBtn = document.getElementById('deleteBtn');
       const deleteStatus = document.getElementById('deleteStatus');
       const pageStatus = document.getElementById('pageStatus');
+      const reportList = document.getElementById('reportList');
+      const listStatus = document.getElementById('listStatus');
+      const refreshListBtn = document.getElementById('refreshListBtn');
 
       function setStatus(el, type, text) {
         if (!el) return;
@@ -141,6 +212,60 @@
       }
 
       setStatus(pageStatus, 'ready', '管理界面已加载');
+
+      function truncate(text, maxLen = 80) {
+        const s = (text == null ? '' : String(text)).trim();
+        if (s.length <= maxLen) return s;
+        return s.slice(0, maxLen) + '...';
+      }
+
+      function renderList(items) {
+        if (!reportList) return;
+        reportList.innerHTML = '';
+        if (!Array.isArray(items) || items.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'muted';
+          empty.textContent = '暂无报告';
+          reportList.appendChild(empty);
+          return;
+        }
+
+        items.forEach(item => {
+          const bindex = item && item.bindex != null ? String(item.bindex) : '';
+          const firstText = item && item.firstText != null ? item.firstText : '';
+
+          const row = document.createElement('div');
+          row.className = 'report-item';
+          row.innerHTML = `
+            <div class="report-id">#${bindex}</div>
+            <div class="report-preview">${truncate(firstText)}</div>
+          `;
+
+          row.addEventListener('click', () => {
+            if (deleteId) {
+              deleteId.value = bindex;
+              deleteId.focus();
+            }
+            setStatus(deleteStatus, 'ready', `已选择：${bindex}`);
+          });
+
+          reportList.appendChild(row);
+        });
+      }
+
+      async function loadReportList() {
+        setStatus(listStatus, 'loading', '正在加载报告列表...');
+        try {
+          const req = new Request('报告列表', 'reports');
+          const resp = await req.get({ refresh: 1 });
+          const items = resp && resp.data ? resp.data.data : null;
+          renderList(items);
+          setStatus(listStatus, 'ready', `加载完成：${Array.isArray(items) ? items.length : 0} 条`);
+        } catch (err) {
+          console.error('加载报告列表失败', err);
+          setStatus(listStatus, 'error', '加载失败，请检查控制台');
+        }
+      }
 
       if (deleteBtn && deleteId) {
         deleteBtn.addEventListener('click', async () => {
@@ -159,6 +284,7 @@
             console.log('删除成功', resp.data);
             setStatus(deleteStatus, 'ready', `已删除：${value}`);
             alert('删除成功');
+            loadReportList();
           } catch (err) {
             console.error('删除失败', err);
             setStatus(deleteStatus, 'error', '删除失败，请检查控制台');
@@ -166,6 +292,12 @@
           }
         });
       }
+
+      if (refreshListBtn) {
+        refreshListBtn.addEventListener('click', loadReportList);
+      }
+
+      loadReportList();
     });
   </script>
 </body>

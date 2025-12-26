@@ -15,15 +15,24 @@ import java.util.regex.Pattern;
 public class BlogReportService {
 
     private static final Pattern SAFE_TABLE_NAME = Pattern.compile("^[A-Za-z0-9_]+$");
+    private static final long REPORT_CACHE_TTL_MS = 30_000L;
+    private static final long LIST_CACHE_TTL_MS = 10_000L;
 
-    private final LruCache<CacheKey, Map<String, Object>> cache = new LruCache<>(128);
+    private final LruCache<CacheKey, TimedValue<Map<String, Object>>> cache = new LruCache<>(128);
+    private final LruCache<Integer, TimedValue<List<Map<String, Object>>>> listCache = new LruCache<>(16);
 
     public Map<String, Object> loadReport(int bindex, int limit) {
+        return loadReport(bindex, limit, false);
+    }
+
+    public Map<String, Object> loadReport(int bindex, int limit, boolean refresh) {
         CacheKey key = new CacheKey(bindex, normalizeLimit(limit));
         synchronized (cache) {
-            Map<String, Object> cached = cache.get(key);
-            if (cached != null) {
-                return cached;
+            if (!refresh) {
+                TimedValue<Map<String, Object>> cached = cache.get(key);
+                if (cached != null && !cached.isExpired(REPORT_CACHE_TTL_MS)) {
+                    return cached.value;
+                }
             }
         }
 
@@ -70,16 +79,113 @@ public class BlogReportService {
 
         if (report != null) {
             synchronized (cache) {
-                cache.put(key, report);
+                cache.put(key, TimedValue.now(report));
             }
         }
 
         return report;
     }
 
+    /**
+     * 报告列表（用于管理页展示）：bindex + 首段文本
+     * @param limit 返回多少条 bindex（不是段落数）
+     */
+    public List<Map<String, Object>> listReports(int limit) {
+        return listReports(limit, false);
+    }
+
+    public List<Map<String, Object>> listReports(int limit, boolean refresh) {
+        int normalizedLimit = Math.min(Math.max(limit, 1), 2000);
+        synchronized (listCache) {
+            if (!refresh) {
+                TimedValue<List<Map<String, Object>>> cached = listCache.get(normalizedLimit);
+                if (cached != null && !cached.isExpired(LIST_CACHE_TTL_MS)) {
+                    return cached.value;
+                }
+            }
+        }
+
+        List<Map<String, Object>> list = HibernateUtil.executeQuery(session -> {
+            NativeQuery<?> q = session.createNativeQuery(
+                "SELECT g.bindex, g.blocks, g.hasChart, COALESCE(t.content, t2.content, '') AS firstText " +
+                "FROM (" +
+                "  SELECT bindex, " +
+                "         COUNT(*) AS blocks, " +
+                "         MAX(CASE WHEN btype = 0 THEN 1 ELSE 0 END) AS hasChart, " +
+                "         MIN(CASE WHEN btype = 1 THEN paragraph ELSE NULL END) AS firstTextParagraph, " +
+                "         MIN(paragraph) AS minParagraphAny " +
+                "  FROM blog GROUP BY bindex" +
+                ") g " +
+                "LEFT JOIN blog t ON t.bindex = g.bindex AND t.btype = 1 AND t.paragraph = g.firstTextParagraph " +
+                "LEFT JOIN blog t2 ON t2.bindex = g.bindex AND t2.paragraph = g.minParagraphAny " +
+                "ORDER BY g.bindex ASC"
+            );
+            q.setMaxResults(normalizedLimit);
+
+            List<?> rows = q.getResultList();
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Object item : rows) {
+                Object[] row = item instanceof Object[] ? (Object[]) item : new Object[]{ item };
+                Integer bindex = toInteger(safeGet(row, 0));
+                Integer blocks = toInteger(safeGet(row, 1));
+                Integer hasChart = toInteger(safeGet(row, 2));
+                String firstText = toStringSafe(safeGet(row, 3));
+
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("bindex", bindex);
+                m.put("firstText", firstText);
+                m.put("blocks", blocks);
+                m.put("hasChart", hasChart != null && hasChart > 0);
+                result.add(m);
+            }
+            return result;
+        });
+
+        synchronized (listCache) {
+            listCache.put(normalizedLimit, TimedValue.now(list));
+        }
+        return list;
+    }
+
+    public int deleteReport(int bindex) {
+        if (bindex <= 0) {
+            throw new IllegalArgumentException("bindex must be positive");
+        }
+
+        final int[] deleted = {0};
+        HibernateUtil.executeInTransaction(session -> {
+            NativeQuery<?> q = session.createNativeQuery("DELETE FROM blog WHERE bindex = :bindex");
+            q.setParameter("bindex", bindex);
+            deleted[0] = q.executeUpdate();
+        });
+
+        if (deleted[0] > 0) {
+            evictByBindex(bindex);
+            synchronized (listCache) {
+                listCache.clear();
+            }
+        }
+        return deleted[0];
+    }
+
     public void clearCache() {
         synchronized (cache) {
             cache.clear();
+        }
+        synchronized (listCache) {
+            listCache.clear();
+        }
+    }
+
+    private void evictByBindex(int bindex) {
+        synchronized (cache) {
+            Iterator<CacheKey> it = cache.keySet().iterator();
+            while (it.hasNext()) {
+                CacheKey key = it.next();
+                if (key.bindex == bindex) {
+                    it.remove();
+                }
+            }
         }
     }
 
@@ -99,6 +205,7 @@ public class BlogReportService {
 
     private static Integer toInteger(Object value) {
         if (value == null) return null;
+        if (value instanceof Boolean) return ((Boolean) value) ? 1 : 0;
         if (value instanceof Number) return ((Number) value).intValue();
         try {
             return Integer.parseInt(String.valueOf(value));
@@ -180,6 +287,24 @@ public class BlogReportService {
         }
     }
 
+    private static final class TimedValue<V> {
+        private final V value;
+        private final long createdAtMs;
+
+        private TimedValue(V value, long createdAtMs) {
+            this.value = value;
+            this.createdAtMs = createdAtMs;
+        }
+
+        private static <V> TimedValue<V> now(V value) {
+            return new TimedValue<>(value, System.currentTimeMillis());
+        }
+
+        private boolean isExpired(long ttlMs) {
+            return ttlMs > 0 && (System.currentTimeMillis() - createdAtMs) > ttlMs;
+        }
+    }
+
     private static final class LruCache<K, V> extends LinkedHashMap<K, V> {
         private final int maxEntries;
 
@@ -194,4 +319,3 @@ public class BlogReportService {
         }
     }
 }
-

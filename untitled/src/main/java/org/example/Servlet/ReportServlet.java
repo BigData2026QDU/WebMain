@@ -9,6 +9,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,10 +38,20 @@ public class ReportServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
+            // 列表接口：GET /reports （无 pathInfo / 无 bindex 参数）
+            if (isListRequest(req)) {
+                int limit = parseLimit(req, 200);
+                boolean refresh = isRefresh(req);
+                List<Map<String, Object>> list = reportService.listReports(limit, refresh);
+                JsonUtil.writeJsonResponse(resp, Response.success(list));
+                return;
+            }
+
             int bindex = parseBindex(req);
             int limit = parseLimit(req, 200);
 
-            Map<String, Object> report = reportService.loadReport(bindex, limit);
+            boolean refresh = isRefresh(req);
+            Map<String, Object> report = reportService.loadReport(bindex, limit, refresh);
 
             if (report == null) {
                 resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -61,6 +73,45 @@ public class ReportServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         doGet(req, resp);
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        try {
+            int bindex = parseBindex(req);
+            int deleted = reportService.deleteReport(bindex);
+            if (deleted <= 0) {
+                resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                JsonUtil.writeJsonResponse(resp, Response.error(404, "未找到可删除的报告：bindex=" + bindex));
+                return;
+            }
+            JsonUtil.writeJsonResponse(resp, Response.success(Collections.singletonMap("deleted", deleted)));
+        } catch (IllegalArgumentException e) {
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            JsonUtil.writeJsonResponse(resp, Response.error(400, e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            JsonUtil.writeJsonResponse(resp, Response.error("删除报告失败: " + e.getMessage()));
+        }
+    }
+
+    private static boolean isListRequest(HttpServletRequest req) {
+        String pathInfo = req.getPathInfo();
+        boolean noPath = (pathInfo == null || pathInfo.trim().isEmpty() || "/".equals(pathInfo));
+
+        String bindex = req.getParameter("bindex");
+        String id = req.getParameter("id");
+        boolean noParams = (bindex == null || bindex.trim().isEmpty()) && (id == null || id.trim().isEmpty());
+
+        return noPath && noParams;
+    }
+
+    private static boolean isRefresh(HttpServletRequest req) {
+        String raw = req.getParameter("refresh");
+        if (raw == null) return false;
+        raw = raw.trim().toLowerCase();
+        return "1".equals(raw) || "true".equals(raw) || "yes".equals(raw) || "y".equals(raw);
     }
 
     private static int parseBindex(HttpServletRequest req) {

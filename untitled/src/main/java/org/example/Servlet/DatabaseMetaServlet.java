@@ -19,6 +19,7 @@ import java.util.Map;
  * API:
  * - GET /api/database/tables           → 获取所有表名
  * - GET /api/database/preview?table=xxx&limit=5  → 预览表数据
+ * - GET /api/database/columns?table=xxx          → 获取表的列名
  */
 @WebServlet("/api/database/*")
 public class DatabaseMetaServlet extends HttpServlet {
@@ -47,8 +48,22 @@ public class DatabaseMetaServlet extends HttpServlet {
                 }
 
                 int limit = parseLimit(req, 5);
-                Map<String, Object> preview = service.previewTable(tableName, limit);
+                List<String> columns = parseColumns(req.getParameter("columns"));
+                Map<String, Object> preview = service.previewTable(tableName, limit, columns);
                 JsonUtil.writeJsonResponse(resp, Response.success(preview));
+                return;
+            }
+
+            // GET /api/database/columns?table=xxx
+            if ("/columns".equals(pathInfo)) {
+                String tableName = req.getParameter("table");
+                if (tableName == null || tableName.trim().isEmpty()) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    JsonUtil.writeJsonResponse(resp, Response.error(400, "缺少参数：table"));
+                    return;
+                }
+                List<String> cols = service.getTableColumns(tableName);
+                JsonUtil.writeJsonResponse(resp, Response.success(cols));
                 return;
             }
 
@@ -75,5 +90,20 @@ public class DatabaseMetaServlet extends HttpServlet {
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+
+    private static List<String> parseColumns(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return null;
+        }
+        String[] parts = raw.split(",");
+        List<String> cols = new java.util.ArrayList<>();
+        for (String p : parts) {
+            if (p == null) continue;
+            String c = p.trim();
+            if (c.isEmpty()) continue;
+            cols.add(c);
+        }
+        return cols;
     }
 }

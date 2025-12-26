@@ -15,6 +15,8 @@ import java.util.regex.Pattern;
 public class BlogReportService {
 
     private static final Pattern SAFE_TABLE_NAME = Pattern.compile("^[A-Za-z0-9_]+$");
+    private static final Pattern SAFE_COLUMN_NAME = Pattern.compile("^[A-Za-z0-9_]+$");
+    private static final Pattern CHART_SPEC_PATTERN = Pattern.compile("^\\s*([A-Za-z0-9_]+)\\s*(?:\\(([^)]*)\\))?\\s*$");
     private static final long REPORT_CACHE_TTL_MS = 30_000L;
     private static final long LIST_CACHE_TTL_MS = 10_000L;
 
@@ -54,7 +56,8 @@ public class BlogReportService {
                 String content = toStringSafe(safeGet(row, 2)).trim();
 
                 if (btype != null && btype == 0) {
-                    Map<String, Object> chart = loadChartTable(session, content, key.limit);
+                    ChartSpec spec = parseChartSpec(content);
+                    Map<String, Object> chart = loadChartTable(session, spec, key.limit);
                     Map<String, Object> block = new LinkedHashMap<>();
                     block.put("type", "chart");
                     block.put("data", chart);
@@ -227,13 +230,45 @@ public class BlogReportService {
         }
     }
 
-    private static Map<String, Object> loadChartTable(org.hibernate.Session session, String tableName, int limit) {
+    private static ChartSpec parseChartSpec(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            throw new IllegalArgumentException("图表配置为空（期望：table 或 table(col1,col2)）");
+        }
+
+        java.util.regex.Matcher m = CHART_SPEC_PATTERN.matcher(raw);
+        if (!m.matches()) {
+            throw new IllegalArgumentException("图表配置格式错误（期望：table 或 table(col1,col2)），收到：" + raw);
+        }
+
+        String tableName = m.group(1);
         requireSafeTableName(tableName);
+
+        String colsPart = m.group(2);
+        List<String> selectedColumns = new ArrayList<>();
+        if (colsPart != null && !colsPart.trim().isEmpty()) {
+            String[] parts = colsPart.split(",");
+            for (String p : parts) {
+                String col = p == null ? "" : p.trim();
+                if (col.isEmpty()) continue;
+                if (!SAFE_COLUMN_NAME.matcher(col).matches()) {
+                    throw new IllegalArgumentException("非法列名：" + col);
+                }
+                if (!selectedColumns.contains(col)) {
+                    selectedColumns.add(col);
+                }
+            }
+        }
+
+        return new ChartSpec(tableName, selectedColumns);
+    }
+
+    private static Map<String, Object> loadChartTable(org.hibernate.Session session, ChartSpec spec, int limit) {
+        requireSafeTableName(spec.tableName);
 
         NativeQuery<?> columnQuery = session.createNativeQuery(
             "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :tableName ORDER BY ORDINAL_POSITION"
         );
-        columnQuery.setParameter("tableName", tableName);
+        columnQuery.setParameter("tableName", spec.tableName);
 
         List<?> columnResults = columnQuery.getResultList();
         List<String> columns = new ArrayList<>();
@@ -241,10 +276,31 @@ public class BlogReportService {
             columns.add(String.valueOf(col));
         }
         if (columns.isEmpty()) {
-            throw new IllegalArgumentException("图表表不存在或无列：" + tableName);
+            throw new IllegalArgumentException("图表表不存在或无列：" + spec.tableName);
         }
 
-        NativeQuery<?> dataQuery = session.createNativeQuery("SELECT * FROM `" + tableName + "` LIMIT " + limit);
+        List<String> selected = spec.selectedColumns == null ? Collections.emptyList() : spec.selectedColumns;
+        if (!selected.isEmpty()) {
+            if (selected.size() < 2) {
+                throw new IllegalArgumentException("图表至少需要选择 2 列（维度列 + 数值列），收到：" + spec.raw());
+            }
+            for (String c : selected) {
+                if (!columns.contains(c)) {
+                    throw new IllegalArgumentException("图表列不存在：" + spec.tableName + "." + c);
+                }
+            }
+            columns = new ArrayList<>(selected);
+        }
+
+        String sql;
+        if (selected.isEmpty()) {
+            sql = "SELECT * FROM `" + spec.tableName + "` LIMIT " + limit;
+        } else {
+            String selectCols = String.join("`,`", columns);
+            sql = "SELECT `" + selectCols + "` FROM `" + spec.tableName + "` LIMIT " + limit;
+        }
+
+        NativeQuery<?> dataQuery = session.createNativeQuery(sql);
         List<?> results = dataQuery.getResultList();
 
         List<List<Object>> rows = new ArrayList<>();
@@ -257,7 +313,7 @@ public class BlogReportService {
         }
 
         Map<String, Object> chart = new LinkedHashMap<>();
-        chart.put("title", tableName);
+        chart.put("title", spec.tableName);
         chart.put("columns", columns);
         chart.put("rows", rows);
         chart.put("config", Collections.singletonMap("xAxisColumn", 0));
@@ -284,6 +340,21 @@ public class BlogReportService {
         @Override
         public int hashCode() {
             return Objects.hash(bindex, limit);
+        }
+    }
+
+    private static final class ChartSpec {
+        private final String tableName;
+        private final List<String> selectedColumns;
+
+        private ChartSpec(String tableName, List<String> selectedColumns) {
+            this.tableName = tableName;
+            this.selectedColumns = selectedColumns == null ? Collections.emptyList() : selectedColumns;
+        }
+
+        private String raw() {
+            if (selectedColumns == null || selectedColumns.isEmpty()) return tableName;
+            return tableName + "(" + String.join(",", selectedColumns) + ")";
         }
     }
 

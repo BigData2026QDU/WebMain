@@ -17,6 +17,7 @@ public class BlogReportService {
     private static final Pattern SAFE_TABLE_NAME = Pattern.compile("^[A-Za-z0-9_]+$");
     private static final Pattern SAFE_COLUMN_NAME = Pattern.compile("^[A-Za-z0-9_]+$");
     private static final Pattern CHART_SPEC_PATTERN = Pattern.compile("^\\s*([A-Za-z0-9_]+)\\s*(?:\\(([^)]*)\\))?\\s*$");
+    private static final Set<String> SUPPORTED_CHART_TYPES = new HashSet<>(Arrays.asList("bar", "line", "pie", "scatter", "mix"));
     private static final long REPORT_CACHE_TTL_MS = 30_000L;
     private static final long LIST_CACHE_TTL_MS = 10_000L;
 
@@ -235,9 +236,23 @@ public class BlogReportService {
             throw new IllegalArgumentException("图表配置为空（期望：table 或 table(col1,col2)）");
         }
 
-        java.util.regex.Matcher m = CHART_SPEC_PATTERN.matcher(raw);
+        String text = raw.trim();
+        String chartType = null;
+        int hashIndex = text.lastIndexOf('#');
+        if (hashIndex > 0 && hashIndex < text.length() - 1) {
+            String maybeType = text.substring(hashIndex + 1).trim().toLowerCase();
+            if (!maybeType.isEmpty()) {
+                if (!SUPPORTED_CHART_TYPES.contains(maybeType)) {
+                    throw new IllegalArgumentException("不支持的图表类型：" + maybeType);
+                }
+                chartType = maybeType;
+                text = text.substring(0, hashIndex).trim();
+            }
+        }
+
+        java.util.regex.Matcher m = CHART_SPEC_PATTERN.matcher(text);
         if (!m.matches()) {
-            throw new IllegalArgumentException("图表配置格式错误（期望：table 或 table(col1,col2)），收到：" + raw);
+            throw new IllegalArgumentException("图表配置格式错误（期望：table 或 table(col1,col2)#type），收到：" + raw);
         }
 
         String tableName = m.group(1);
@@ -259,7 +274,7 @@ public class BlogReportService {
             }
         }
 
-        return new ChartSpec(tableName, selectedColumns);
+        return new ChartSpec(tableName, selectedColumns, chartType);
     }
 
     private static Map<String, Object> loadChartTable(org.hibernate.Session session, ChartSpec spec, int limit) {
@@ -314,6 +329,9 @@ public class BlogReportService {
 
         Map<String, Object> chart = new LinkedHashMap<>();
         chart.put("title", spec.tableName);
+        if (spec.chartType != null && !spec.chartType.trim().isEmpty()) {
+            chart.put("chartType", spec.chartType);
+        }
         chart.put("columns", columns);
         chart.put("rows", rows);
         chart.put("config", Collections.singletonMap("xAxisColumn", 0));
@@ -346,15 +364,19 @@ public class BlogReportService {
     private static final class ChartSpec {
         private final String tableName;
         private final List<String> selectedColumns;
+        private final String chartType;
 
-        private ChartSpec(String tableName, List<String> selectedColumns) {
+        private ChartSpec(String tableName, List<String> selectedColumns, String chartType) {
             this.tableName = tableName;
             this.selectedColumns = selectedColumns == null ? Collections.emptyList() : selectedColumns;
+            this.chartType = chartType;
         }
 
         private String raw() {
             if (selectedColumns == null || selectedColumns.isEmpty()) return tableName;
-            return tableName + "(" + String.join(",", selectedColumns) + ")";
+            String base = tableName + "(" + String.join(",", selectedColumns) + ")";
+            if (chartType == null || chartType.trim().isEmpty()) return base;
+            return base + "#" + chartType;
         }
     }
 

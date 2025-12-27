@@ -14,6 +14,14 @@
     constructor() {
       this.blocks = [];
       this.tableNames = [];
+      this.tableColumnsCache = new Map(); // tableName -> string[]
+      this.supportedChartTypes = [
+        { type: 'bar', name: '柱状图' },
+        { type: 'line', name: '折线图' },
+        { type: 'pie', name: '饼图' },
+        { type: 'scatter', name: '散点图' },
+        { type: 'mix', name: '混合图' }
+      ];
       this.currentBindex = null;
       this.mode = 'new'; // 'new' or 'existing'
 
@@ -133,12 +141,25 @@
         this.currentBindex = detail.bindex;
 
         // 规范化 blocks：添加 _id，规范化 type
-        this.blocks = (detail.blocks || []).map(b => ({
-          ...b,
-          type: (b.type || 'text').toString().trim().toLowerCase(), // 规范化 type
-          content: b.content || '',
-          _id: Date.now() + Math.random() // 添加临时ID
-        }));
+        this.blocks = (detail.blocks || []).map(b => {
+          const type = (b.type || 'text').toString().trim().toLowerCase();
+          const content = b.content || '';
+          const block = {
+            ...b,
+            type,
+            content,
+            _id: Date.now() + Math.random()
+          };
+
+          if (type === 'chart') {
+            const parsed = this.parseChartSpec(content);
+            block._table = parsed.tableName || '';
+            block._columns = parsed.columns || [];
+            block._chartType = parsed.chartType || 'bar';
+          }
+
+          return block;
+        });
 
         this.renderBlocks();
         this.showMessage(`已加载报告 ${bindex}，共 ${this.blocks.length} 个内容块`, 'success');
@@ -153,6 +174,9 @@
       const block = {
         type: type,
         content: '',
+        _table: '',
+        _columns: [],
+        _chartType: 'bar',
         _id: Date.now() + Math.random() // 临时ID用于DOM操作
       };
       this.blocks.push(block);
@@ -265,14 +289,40 @@
         const option = document.createElement('option');
         option.value = table;
         option.textContent = table;
-        if (block.content === table) {
+        if (block._table === table || block.content === table) {
           option.selected = true;
         }
         select.appendChild(option);
       });
 
       select.addEventListener('change', (e) => {
-        block.content = e.target.value;
+        block._table = e.target.value;
+        block._columns = [];
+        block.content = this.buildChartSpec(block._table || '', block._columns || [], block._chartType || 'bar');
+        this.renderChartColumnSelector(block, wrapper);
+      });
+
+      const typeLabel = document.createElement('label');
+      typeLabel.textContent = '默认类型:';
+
+      const typeSelect = document.createElement('select');
+      this.supportedChartTypes.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.type;
+        option.textContent = t.name;
+        if ((block._chartType || 'bar') === t.type) {
+          option.selected = true;
+        }
+        typeSelect.appendChild(option);
+      });
+      typeSelect.addEventListener('change', (e) => {
+        block._chartType = e.target.value;
+        block.content = this.buildChartSpec(block._table || '', block._columns || [], block._chartType || 'bar');
+        // 更新列选择器底部提示（如果存在）
+        const footer = wrapper.querySelector('.chart-columns .muted');
+        if (footer) {
+          footer.textContent = `已选择 ${block._columns.length} 列：${block.content}`;
+        }
       });
 
       const previewBtn = document.createElement('button');
@@ -282,9 +332,133 @@
 
       wrapper.appendChild(label);
       wrapper.appendChild(select);
+      wrapper.appendChild(typeLabel);
+      wrapper.appendChild(typeSelect);
       wrapper.appendChild(previewBtn);
 
+      // 初次渲染列选择器
+      this.renderChartColumnSelector(block, wrapper);
+
       return wrapper;
+    }
+
+    parseChartSpec(raw) {
+      const text = (raw == null ? '' : String(raw)).trim();
+      if (!text) return { tableName: '', columns: [] };
+      // 支持 table(col1,col2)#type
+      const [main, typePart] = text.split('#');
+      const chartType = (typePart || '').trim().toLowerCase();
+
+      const match = (main || '').trim().match(/^([A-Za-z0-9_]+)\s*(?:\(([^)]*)\))?$/);
+      if (!match) return { tableName: text, columns: [] };
+      const tableName = match[1];
+      const colsPart = match[2];
+      const columns = [];
+      if (colsPart) {
+        colsPart.split(',').forEach(p => {
+          const c = (p || '').trim();
+          if (c && !columns.includes(c)) columns.push(c);
+        });
+      }
+      return { tableName, columns, chartType: chartType || null };
+    }
+
+    buildChartSpec(tableName, columns, chartType) {
+      const t = (tableName == null ? '' : String(tableName)).trim();
+      if (!t) return '';
+      const cols = Array.isArray(columns) ? columns.filter(Boolean).map(c => String(c).trim()).filter(Boolean) : [];
+      const base = cols.length === 0 ? t : `${t}(${cols.join(',')})`;
+      const ct = (chartType == null ? '' : String(chartType)).trim().toLowerCase();
+      if (!ct) return base;
+      return `${base}#${ct}`;
+    }
+
+    async getTableColumns(tableName) {
+      const t = (tableName == null ? '' : String(tableName)).trim();
+      if (!t) return [];
+      if (this.tableColumnsCache.has(t)) {
+        return this.tableColumnsCache.get(t);
+      }
+
+      const req = new Request('获取表列名', 'api/database/columns');
+      const resp = await req.get({ table: t });
+      const cols = (resp.data && resp.data.data) ? resp.data.data : [];
+      this.tableColumnsCache.set(t, cols);
+      return cols;
+    }
+
+    renderChartColumnSelector(block, wrapper) {
+      // 移除旧的列选择区
+      const old = wrapper.querySelector('.chart-columns');
+      if (old) old.remove();
+
+      const tableName = block._table || '';
+      if (!tableName) return;
+
+      const container = document.createElement('div');
+      container.className = 'chart-columns';
+      container.style.cssText = 'width:100%; margin-top:10px; display:flex; flex-direction:column; gap:8px;';
+
+      const hint = document.createElement('div');
+      hint.className = 'muted';
+      hint.textContent = '选择要展示的列（建议：第1列为维度，其余为数值列；至少选择2列）。';
+      hint.style.cssText = 'color: var(--text-secondary); font-size: 13px;';
+      container.appendChild(hint);
+
+      const box = document.createElement('div');
+      box.className = 'chart-columns-box';
+      box.style.cssText = 'display:flex; flex-wrap:wrap; gap:8px;';
+      container.appendChild(box);
+
+      const footer = document.createElement('div');
+      footer.className = 'muted';
+      footer.style.cssText = 'color: var(--text-secondary); font-size: 12px;';
+      footer.textContent = '加载列名中...';
+      container.appendChild(footer);
+
+      wrapper.appendChild(container);
+
+      this.getTableColumns(tableName)
+        .then(cols => {
+          box.innerHTML = '';
+
+          // 兼容旧数据：如果是纯表名（无选列），默认帮用户勾选前两列，避免“一张图塞进所有列”不直观
+          if ((!block._columns || block._columns.length === 0) && (block.content === tableName || !block.content)) {
+            block._columns = cols.slice(0, 2);
+          }
+
+          cols.forEach(col => {
+            const id = `col-${block._id}-${col}`;
+            const label = document.createElement('label');
+            label.style.cssText = 'display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border-color); border-radius:999px; background: var(--bg-secondary);';
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.id = id;
+            input.checked = Array.isArray(block._columns) && block._columns.includes(col);
+            input.addEventListener('change', () => {
+              const selected = new Set(block._columns || []);
+              if (input.checked) selected.add(col); else selected.delete(col);
+              block._columns = Array.from(selected);
+              block.content = this.buildChartSpec(block._table, block._columns, block._chartType || 'bar');
+              footer.textContent = `已选择 ${block._columns.length} 列：${block.content}`;
+            });
+
+            const span = document.createElement('span');
+            span.textContent = col;
+
+            label.appendChild(input);
+            label.appendChild(span);
+            box.appendChild(label);
+          });
+
+          block.content = this.buildChartSpec(block._table, block._columns, block._chartType || 'bar');
+          footer.textContent = `已选择 ${block._columns.length} 列：${block.content}`;
+        })
+        .catch(err => {
+          console.error('加载列名失败', err);
+          footer.textContent = '加载列名失败，请检查控制台';
+        });
     }
 
     async previewTableData(tableName, containerEl) {
@@ -295,7 +469,12 @@
 
       try {
         const req = new Request('预览表数据', 'api/database/preview');
-        const resp = await req.get({ table: tableName, limit: 5 });
+        const parsed = this.parseChartSpec(tableName);
+        const resp = await req.get({
+          table: parsed.tableName,
+          limit: 5,
+          columns: parsed.columns && parsed.columns.length > 0 ? parsed.columns.join(',') : ''
+        });
         const data = resp.data.data;
 
         // 移除旧预览
@@ -346,11 +525,26 @@
 
       // 过滤空内容块
       const blocks = this.blocks
-        .filter(b => b.content && b.content.trim())
-        .map(b => ({ type: b.type, content: b.content }));
+        .map(b => {
+          if (b.type === 'chart') {
+            const spec = this.buildChartSpec(b._table || '', b._columns || [], b._chartType || 'bar');
+            return { type: 'chart', content: spec };
+          }
+          return { type: 'text', content: b.content || '' };
+        })
+        .filter(b => b.content && b.content.trim());
 
       if (blocks.length === 0) {
         alert('至少需要一个非空内容块');
+        return;
+      }
+
+      // 基础校验：图表块至少选择 2 列（table(col1,col2)）或只填 table（表示全部列，可能很多列不直观）
+      const invalidCharts = blocks.filter(b => b.type === 'chart')
+        .map(b => this.parseChartSpec(b.content))
+        .filter(p => p.tableName && p.columns && p.columns.length === 1);
+      if (invalidCharts.length > 0) {
+        alert('图表块选择列不完整：至少选择 2 列（维度列 + 数值列）。');
         return;
       }
 

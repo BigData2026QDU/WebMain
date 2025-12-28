@@ -1,4 +1,4 @@
-package org.example.pool;
+package org.example.Tool;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
@@ -67,23 +67,23 @@ public final class ServicePoolManager {
         try {
             return pool.borrowObject();
         } catch (Exception e) {
-            throw new RuntimeException("Borrow service failed: " + serviceClass.getName(), e);
+            throw new RuntimeException("Borrow Service failed: " + serviceClass.getName(), e);
         }
     }
 
     public <T> void returnService(Class<T> serviceClass, T service) {
-        Objects.requireNonNull(service, "service");
+        Objects.requireNonNull(service, "Service");
         GenericObjectPool<T> pool = getPool(serviceClass);
         pool.returnObject(service);
     }
 
     public <T> void invalidateService(Class<T> serviceClass, T service) {
-        Objects.requireNonNull(service, "service");
+        Objects.requireNonNull(service, "Service");
         GenericObjectPool<T> pool = getPool(serviceClass);
         try {
             pool.invalidateObject(service);
         } catch (Exception e) {
-            throw new RuntimeException("Invalidate service failed: " + serviceClass.getName(), e);
+            throw new RuntimeException("Invalidate Service failed: " + serviceClass.getName(), e);
         }
     }
 

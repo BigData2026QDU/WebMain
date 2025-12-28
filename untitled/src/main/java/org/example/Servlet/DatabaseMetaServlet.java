@@ -2,7 +2,7 @@ package org.example.Servlet;
 
 import org.example.Model.Response;
 import org.example.Tool.JsonUtil;
-import org.example.service.DatabaseMetaService;
+import org.example.Service.DatabaseMetaService;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;

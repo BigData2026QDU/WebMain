@@ -3,7 +3,7 @@ package org.example.Servlet;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.Model.Response;
 import org.example.Tool.JsonUtil;
-import org.example.service.BlogEditorService;
+import org.example.Service.BlogEditorService;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;

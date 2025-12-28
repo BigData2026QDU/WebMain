@@ -3,8 +3,8 @@ package org.example.Servlet;
 import org.example.Tool.JsonUtil;
 import org.example.User;
 import org.example.Model.Response;
-import org.example.pool.ServicePoolManager;
-import org.example.service.UserService;
+import org.example.Tool.ServicePoolManager;
+import org.example.Service.UserService;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -81,7 +81,7 @@ public class RegisterServlet extends HttpServlet {
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             JsonUtil.writeJsonResponse(resp, Response.error(HttpServletResponse.SC_BAD_REQUEST, "Invalid JSON format: " + e.getMessage()));
         } finally {
-            // Always return service to pool
+            // Always return Service to pool
             if (userService != null) {
                 poolManager.returnService(UserService.class, userService);
             }

@@ -1,4 +1,4 @@
-package org.example.service;
+package org.example.Service;
 
 import org.example.Tool.HibernateUtil;
 import org.hibernate.query.NativeQuery;

@@ -1,4 +1,4 @@
-package org.example.util;
+package org.example.Tool;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

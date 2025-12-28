@@ -17,10 +17,12 @@
 ### 1. 注册 Service（应用启动时做一次）
 
 ```java
-import org.example.pool.ServicePoolManager;
+import org.example.Tool.ServicePoolManager;
 
 ServicePoolManager poolManager = ServicePoolManager.getInstance();
-poolManager.registerService(ExpensiveService.class, ExpensiveService::new, 32);
+poolManager.
+
+registerService(ExpensiveService .class, ExpensiveService::new, 32);
 ```
 
 ### 2. 借用与归还

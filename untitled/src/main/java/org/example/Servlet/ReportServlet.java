@@ -2,7 +2,7 @@ package org.example.Servlet;
 
 import org.example.Tool.JsonUtil;
 import org.example.Model.Response;
-import org.example.service.BlogReportService;
+import org.example.Service.BlogReportService;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;

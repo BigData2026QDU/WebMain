@@ -48,52 +48,71 @@
             }
         }
 
-        bindEvents() {
-            // 模式切换
-            const modeSelect = document.getElementById('bindexMode');
-            const bindexInput = document.getElementById('bindexInput');
-            const listSelector = document.getElementById('reportListSelector');
-            const loadBtn = document.getElementById('loadBtn');
-            const refreshListBtn = document.getElementById('refreshListBtn');
+    bindEvents() {
+      // 模式切换
+      const modeSelect = document.getElementById('bindexMode');
+      const bindexAuto = document.getElementById('bindexAuto');
+      const bindexInput = document.getElementById('bindexInput'); // hidden compatibility
+      const listSelector = document.getElementById('reportListSelector');
+      const loadBtn = document.getElementById('loadBtn');
+      const refreshListBtn = document.getElementById('refreshListBtn');
 
-            modeSelect.addEventListener('change', (e) => {
-                this.mode = e.target.value;
-                if (this.mode === 'new') {
-                    bindexInput.disabled = false;
-                    listSelector.style.display = 'none';
-                    refreshListBtn.style.display = 'none';
-                    loadBtn.disabled = false;
-                    loadBtn.textContent = '开始新建';
-                } else {
-                    bindexInput.disabled = true;
-                    listSelector.style.display = 'inline-block';
-                    refreshListBtn.style.display = 'inline-block';
-                    loadBtn.disabled = false;
-                    loadBtn.textContent = '加载报告';
-                    this.loadReportList();
-                }
-            });
+      if (!modeSelect || !listSelector || !loadBtn || !refreshListBtn) {
+        console.error('BlogEditor: 页面DOM不完整，无法初始化事件绑定', {
+          modeSelect: !!modeSelect,
+          listSelector: !!listSelector,
+          loadBtn: !!loadBtn,
+          refreshListBtn: !!refreshListBtn
+        });
+        return;
+      }
 
-            // 加载/新建按钮
-            loadBtn.addEventListener('click', () => {
-                if (this.mode === 'new') {
-                    const bindex = parseInt(bindexInput.value);
-                    if (bindex > 0) {
-                        this.currentBindex = bindex;
-                        this.blocks = [];
-                        this.renderBlocks();
-                        this.showMessage(`已创建新报告 ${bindex}，请添加内容块`, 'success');
-                    }
-                } else {
-                    const bindex = parseInt(listSelector.value);
-                    if (bindex > 0) {
-                        this.loadReport(bindex);
-                    }
-                }
-            });
+      const syncModeUI = () => {
+        const value = modeSelect.value;
+        this.mode = value;
+        if (value === 'new') {
+          if (bindexAuto) bindexAuto.style.display = 'inline-flex';
+          if (bindexInput) bindexInput.disabled = true;
+          listSelector.style.display = 'none';
+          refreshListBtn.style.display = 'none';
+          loadBtn.disabled = false;
+          loadBtn.textContent = '开始新建';
+          this.prepareNextBindex();
+        } else {
+          if (bindexAuto) bindexAuto.style.display = 'none';
+          if (bindexInput) bindexInput.disabled = true;
+          listSelector.style.display = 'inline-block';
+          refreshListBtn.style.display = 'inline-block';
+          loadBtn.disabled = false;
+          loadBtn.textContent = '加载报告';
+          this.loadReportList();
+        }
+      };
 
-            // 刷新列表
-            refreshListBtn.addEventListener('click', () => this.loadReportList());
+      modeSelect.addEventListener('change', (e) => {
+        syncModeUI();
+      });
+
+      // 加载/新建按钮
+      loadBtn.addEventListener('click', async () => {
+        if (this.mode === 'new') {
+          const bindex = await this.fetchNextBindex();
+          if (!bindex) return;
+          this.currentBindex = bindex;
+          if (bindexInput) bindexInput.value = String(bindex);
+          this.blocks = [];
+          this.renderBlocks();
+          this.showMessage(`已创建新报告 ${bindex}（自动分配），请添加内容块`, 'success');
+        } else {
+          const bindex = parseInt(listSelector.value);
+          if (bindex > 0) {
+            this.loadReport(bindex);
+          }
+        }
+      });
+
+      // 刷新列表
+      refreshListBtn.addEventListener('click', () => this.loadReportList());
 
             // 添加块
             document.getElementById('addTextBtn').addEventListener('click', () => this.addBlock('text'));
@@ -105,16 +124,54 @@
             document.getElementById('previewBtn').addEventListener('click', () => this.previewReport());
 
             // 关闭预览
-            document.getElementById('closePreview').addEventListener('click', () => {
-                document.getElementById('previewModal').classList.remove('active');
-            });
-        }
+      document.getElementById('closePreview').addEventListener('click', () => {
+        document.getElementById('previewModal').classList.remove('active');
+      });
 
-        async loadReportList() {
-            try {
-                const req = new Request('获取报告列表', 'api/blog/editor/list');
-                const resp = await req.get({ limit: 100 });
-                const list = resp.data.data || [];
+      // 初始化：同步一次 UI 状态（默认 new 会把按钮启用，否则页面看起来“没反应”）
+      syncModeUI();
+    }
+
+    async prepareNextBindex() {
+      const bindexAuto = document.getElementById('bindexAuto');
+      const bindexInput = document.getElementById('bindexInput');
+      if (bindexAuto) bindexAuto.textContent = '自动分配...';
+      try {
+        const bindex = await this.fetchNextBindex();
+        if (bindex) {
+          if (bindexAuto) bindexAuto.textContent = `下一个 bindex：${bindex}`;
+          if (bindexInput) bindexInput.value = String(bindex);
+        } else {
+          if (bindexAuto) bindexAuto.textContent = '自动分配失败';
+        }
+      } catch (e) {
+        if (bindexAuto) bindexAuto.textContent = '自动分配失败';
+      }
+    }
+
+    async fetchNextBindex() {
+      try {
+        const req = new Request('获取下一个 bindex', 'api/blog/editor/next');
+        const resp = await req.get({ refresh: 1 });
+        const data = resp && resp.data ? resp.data.data : null;
+        const bindex = data && data.bindex != null ? parseInt(data.bindex) : NaN;
+        if (!bindex || Number.isNaN(bindex) || bindex <= 0) {
+          this.showMessage('无法获取下一个 bindex', 'error');
+          return null;
+        }
+        return bindex;
+      } catch (error) {
+        console.error('获取下一个 bindex 失败:', error);
+        this.showMessage('获取下一个 bindex 失败', 'error');
+        return null;
+      }
+    }
+
+    async loadReportList() {
+      try {
+        const req = new Request('获取报告列表', 'api/blog/editor/list');
+        const resp = await req.get({ limit: 100, refresh: 1 });
+        const list = resp.data.data || [];
 
                 const selector = document.getElementById('reportListSelector');
                 selector.innerHTML = '<option value="">选择报告...</option>';
@@ -126,11 +183,11 @@
                     selector.appendChild(option);
                 });
 
-            } catch (error) {
-                console.error('加载报告列表失败:', error);
-                this.showMessage('加载报告列表失败', 'error');
-            }
-        }
+      } catch (error) {
+        console.error('加载报告列表失败:', error);
+        this.showMessage('加载报告列表失败', 'error');
+      }
+    }
 
         async loadReport(bindex) {
             try {

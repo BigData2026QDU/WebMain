@@ -13,6 +13,15 @@ public class BlogEditorService {
 
     private final BlogReportService reportService = new BlogReportService();
 
+    public int getNextBindex() {
+        Integer max = HibernateUtil.executeQuery(session -> {
+            Object v = session.createNativeQuery("SELECT MAX(bindex) FROM blog").uniqueResult();
+            return toInteger(v);
+        });
+        int safeMax = max == null ? 0 : max;
+        return safeMax + 1;
+    }
+
     /**
      * 获取报告原始数据（用于编辑）
      * @param bindex 报告索引
@@ -123,6 +132,10 @@ public class BlogEditorService {
      */
     public List<Map<String, Object>> listReports(int limit) {
         return reportService.listReports(limit);
+    }
+
+    public List<Map<String, Object>> listReports(int limit, boolean refresh) {
+        return reportService.listReports(limit, refresh);
     }
 
     private static Object safeGet(Object[] row, int index) {

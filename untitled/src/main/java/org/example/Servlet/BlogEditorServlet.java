@@ -21,6 +21,7 @@ import java.util.Map;
  *
  * API:
  * - GET    /api/blog/editor/list                  → 报告列表
+ * - GET    /api/blog/editor/next                  → 获取下一个可用 bindex（避免覆盖旧报告）
  * - GET    /api/blog/editor/detail?bindex=1       → 获取报告原始数据（用于编辑）
  * - POST   /api/blog/editor/save                  → 保存报告
  *          Body: {bindex: 1, blocks: [{type, content}, ...]}
@@ -40,8 +41,16 @@ public class BlogEditorServlet extends HttpServlet {
             // GET /api/blog/editor/list
             if ("/list".equals(pathInfo)) {
                 int limit = parseLimit(req, 100);
-                List<Map<String, Object>> list = service.listReports(limit);
+                boolean refresh = isRefresh(req);
+                List<Map<String, Object>> list = service.listReports(limit, refresh);
                 JsonUtil.writeJsonResponse(resp, Response.success(list));
+                return;
+            }
+
+            // GET /api/blog/editor/next
+            if ("/next".equals(pathInfo)) {
+                int next = service.getNextBindex();
+                JsonUtil.writeJsonResponse(resp, Response.success(Collections.singletonMap("bindex", next)));
                 return;
             }
 
@@ -183,6 +192,13 @@ public class BlogEditorServlet extends HttpServlet {
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+
+    private static boolean isRefresh(HttpServletRequest req) {
+        String raw = req.getParameter("refresh");
+        if (raw == null) return false;
+        raw = raw.trim().toLowerCase();
+        return "1".equals(raw) || "true".equals(raw) || "yes".equals(raw) || "y".equals(raw);
     }
 
     private static Integer toInteger(Object value) {

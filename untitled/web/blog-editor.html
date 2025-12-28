@@ -323,7 +323,11 @@
           <option value="new">新建报告</option>
           <option value="existing">编辑已有</option>
         </select>
-        <input type="number" id="bindexInput" value="1" min="1" placeholder="输入 bindex" disabled>
+        <span id="bindexAuto" style="display: inline-flex; align-items: center; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary); color: var(--text-secondary); font-size: 14px; min-width: 120px;">
+          自动分配...
+        </span>
+        <!-- 兼容：旧版脚本曾依赖 bindexInput；隐藏保留以避免浏览器缓存旧脚本时空指针 -->
+        <input type="number" id="bindexInput" value="1" min="1" placeholder="输入 bindex" disabled style="display:none;">
         <select id="reportListSelector" style="display: none;">
           <option value="">加载中...</option>
         </select>

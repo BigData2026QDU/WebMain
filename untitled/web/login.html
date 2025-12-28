@@ -190,9 +190,12 @@
           console.log('登录成功:', response.data.data);
           showMessage('登录成功！正在跳转...', 'success');
 
-          // 延迟跳转到主页
+          // 根据用户角色跳转到不同页面
+          const isAdmin = response.data.data.isAdmin;
+          const targetPage = isAdmin ? 'manage.html' : 'show-report.html';
+
           setTimeout(() => {
-            window.location.href = 'manage.html';
+            window.location.href = targetPage;
           }, 1500);
 
         } catch (error) {

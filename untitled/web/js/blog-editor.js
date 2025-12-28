@@ -162,7 +162,16 @@
         return bindex;
       } catch (error) {
         console.error('获取下一个 bindex 失败:', error);
-        this.showMessage('获取下一个 bindex 失败', 'error');
+
+        // 检查是否是权限错误
+        if (error.response && error.response.status === 403) {
+          this.showMessage('获取 bindex 失败：你没有管理员权限，无法创建新报告', 'error');
+        } else if (error.response && error.response.data && error.response.data.message) {
+          this.showMessage('获取 bindex 失败：' + error.response.data.message, 'error');
+        } else {
+          this.showMessage('获取下一个 bindex 失败', 'error');
+        }
+
         return null;
       }
     }
@@ -615,7 +624,15 @@
                 this.showMessage(`报告 ${this.currentBindex} 保存成功，共 ${blocks.length} 个内容块`, 'success');
             } catch (error) {
                 console.error('保存失败:', error);
-                this.showMessage('保存失败', 'error');
+
+                // 检查是否是权限错误
+                if (error.response && error.response.status === 403) {
+                    this.showMessage('保存失败：你没有管理员权限，无法执行此操作', 'error');
+                } else if (error.response && error.response.data && error.response.data.message) {
+                    this.showMessage('保存失败：' + error.response.data.message, 'error');
+                } else {
+                    this.showMessage('保存失败', 'error');
+                }
             }
         }
 
@@ -643,7 +660,15 @@
                 }
             } catch (error) {
                 console.error('删除失败:', error);
-                this.showMessage('删除失败', 'error');
+
+                // 检查是否是权限错误
+                if (error.response && error.response.status === 403) {
+                    this.showMessage('删除失败：你没有管理员权限，无法执行此操作', 'error');
+                } else if (error.response && error.response.data && error.response.data.message) {
+                    this.showMessage('删除失败：' + error.response.data.message, 'error');
+                } else {
+                    this.showMessage('删除失败', 'error');
+                }
             }
         }
 

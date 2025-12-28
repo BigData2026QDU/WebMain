@@ -10,6 +10,7 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.Collections;
@@ -49,6 +50,7 @@ public class BlogEditorServlet extends HttpServlet {
 
             // GET /api/blog/editor/next
             if ("/next".equals(pathInfo)) {
+                requireAdmin(req, resp);
                 int next = service.getNextBindex();
                 JsonUtil.writeJsonResponse(resp, Response.success(Collections.singletonMap("bindex", next)));
                 return;
@@ -66,6 +68,9 @@ public class BlogEditorServlet extends HttpServlet {
             resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
             JsonUtil.writeJsonResponse(resp, Response.error(404, "未知路径：" + pathInfo));
 
+        } catch (SecurityException e) {
+            // 权限验证失败（已在 requireAdmin 中设置响应，直接返回）
+            return;
         } catch (IllegalArgumentException e) {
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             JsonUtil.writeJsonResponse(resp, Response.error(400, e.getMessage()));
@@ -83,6 +88,9 @@ public class BlogEditorServlet extends HttpServlet {
         try {
             // POST /api/blog/editor/save
             if ("/save".equals(pathInfo)) {
+                // 权限检查
+                requireAdmin(req, resp);
+
                 // 设置请求编码
                 req.setCharacterEncoding("UTF-8");
 
@@ -127,6 +135,9 @@ public class BlogEditorServlet extends HttpServlet {
             resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
             JsonUtil.writeJsonResponse(resp, Response.error(404, "未知路径：" + pathInfo));
 
+        } catch (SecurityException e) {
+            // 权限验证失败（已在 requireAdmin 中设置响应，直接返回）
+            return;
         } catch (IllegalArgumentException e) {
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             JsonUtil.writeJsonResponse(resp, Response.error(400, e.getMessage()));
@@ -144,6 +155,9 @@ public class BlogEditorServlet extends HttpServlet {
         try {
             // DELETE /api/blog/editor/delete?bindex=1
             if ("/delete".equals(pathInfo)) {
+                // 权限检查
+                requireAdmin(req, resp);
+
                 int bindex = parseBindex(req);
                 int deleted = service.deleteReport(bindex);
 
@@ -161,6 +175,9 @@ public class BlogEditorServlet extends HttpServlet {
             resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
             JsonUtil.writeJsonResponse(resp, Response.error(404, "未知路径：" + pathInfo));
 
+        } catch (SecurityException e) {
+            // 权限验证失败（已在 requireAdmin 中设置响应，直接返回）
+            return;
         } catch (IllegalArgumentException e) {
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             JsonUtil.writeJsonResponse(resp, Response.error(400, e.getMessage()));
@@ -208,6 +225,21 @@ public class BlogEditorServlet extends HttpServlet {
             return Integer.parseInt(String.valueOf(value));
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    /**
+     * 检查管理员权限
+     * 如果不是管理员，抛出 SecurityException 并返回 403 响应
+     */
+    private void requireAdmin(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        HttpSession session = req.getSession(false);
+        Boolean isAdmin = (session != null) ? (Boolean) session.getAttribute("isAdmin") : null;
+
+        if (isAdmin == null || !isAdmin) {
+            resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            JsonUtil.writeJsonResponse(resp, Response.error(403, "需要管理员权限"));
+            throw new SecurityException("Unauthorized: Admin role required");
         }
     }
 }

@@ -21,7 +21,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.event.issue.title, '[可发布]')
     runs-on: ubuntu-latest
     env:
-      MAVEN_SETTINGS_PATH: ${{ runner.temp }}/settings.xml
+      MAVEN_SETTINGS_PATH: /tmp/webmain-maven-settings.xml
       MAVEN_REPO_USERNAME: ${{ github.actor }}
       MAVEN_REPO_TOKEN: ${{ github.token }}
 

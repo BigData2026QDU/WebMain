@@ -1,0 +1,81 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      MAVEN_SETTINGS_PATH: ${{ runner.temp }}/settings.xml
+      MAVEN_REPO_USERNAME: ${{ secrets.PACKAGES_USERNAME != '' && secrets.PACKAGES_USERNAME || github.actor }}
+      MAVEN_REPO_TOKEN: ${{ secrets.PACKAGES_TOKEN != '' && secrets.PACKAGES_TOKEN || github.token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Write Maven settings
+        shell: bash
+        run: |
+          cat <<EOF > "$MAVEN_SETTINGS_PATH"
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>github-database-connect</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+              <server>
+                <id>github-json-util-module</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+              <server>
+                <id>github-service-pool</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+              <server>
+                <id>github-webmain</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Build WAR package
+        working-directory: hivehbase
+        run: mvn -B -ntp -s "$MAVEN_SETTINGS_PATH" clean package -DskipTests
+
+      - name: Upload WAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hivehbase-war
+          path: hivehbase/target/hivehbase.war
+          if-no-files-found: error

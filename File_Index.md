@@ -9,6 +9,8 @@
 | File_Index.md | 文件索引 | 当前文件清单 |
 | .gitmodules | 子模块声明 | 声明 `AGENTS` 与 `web` 子模块 |
 | .gitignore | Git 忽略规则 | 忽略构建产物、IDE 配置等 |
+| .github/workflows/ci.yml | 构建工作流 | 负责递归子模块构建与 WAR 产物上传 |
+| .github/workflows/release.yml | 发布工作流 | 响应 `[可发布]` Issue 或手动触发，执行发布 |
 | sql/init.sql | 数据库初始化 | 初始化 `user` 与 `blog` 两张业务表 |
 
 ## 后端主工程 `hivehbase/`

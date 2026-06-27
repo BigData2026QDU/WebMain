@@ -1,0 +1,219 @@
+name: Release
+
+on:
+  issues:
+    types:
+      - opened
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "可选，手动指定发布版本号，例如 1.0.0"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  packages: write
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.issue.title, '[可发布]')
+    runs-on: ubuntu-latest
+    env:
+      MAVEN_SETTINGS_PATH: ${{ runner.temp }}/settings.xml
+      MAVEN_REPO_USERNAME: ${{ secrets.PACKAGES_USERNAME != '' && secrets.PACKAGES_USERNAME || github.actor }}
+      MAVEN_REPO_TOKEN: ${{ secrets.PACKAGES_TOKEN != '' && secrets.PACKAGES_TOKEN || github.token }}
+
+    steps:
+      - name: Acknowledge release trigger
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '## 已接收发布请求',
+                '',
+                '- 触发条件：Issue 标题以 `[可发布]` 开头',
+                '- 当前仓库职责：仅执行构建与发布，不在本仓库运行测试',
+                '- 前置验证：由外部测试框架负责'
+              ].join('\n')
+            });
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Write Maven settings
+        shell: bash
+        run: |
+          cat <<EOF > "$MAVEN_SETTINGS_PATH"
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>github-database-connect</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+              <server>
+                <id>github-json-util-module</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+              <server>
+                <id>github-service-pool</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+              <server>
+                <id>github-webmain</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Resolve release version
+        id: version
+        env:
+          MANUAL_RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_version || '' }}
+        shell: bash
+        run: |
+          if [ -n "$MANUAL_RELEASE_VERSION" ]; then
+            RAW_VERSION="${MANUAL_RELEASE_VERSION#v}"
+          else
+            RAW_VERSION="$(python - <<'PY'
+import xml.etree.ElementTree as ET
+
+ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+tree = ET.parse('hivehbase/pom.xml')
+version = tree.getroot().find('m:version', ns)
+print(version.text.strip() if version is not None else '')
+PY
+)"
+            RAW_VERSION="${RAW_VERSION%-SNAPSHOT}"
+          fi
+
+          IFS='.' read -r -a PARTS <<< "$RAW_VERSION"
+          if [ "${#PARTS[@]}" -eq 2 ]; then
+            RAW_VERSION="${RAW_VERSION}.0"
+          fi
+
+          if ! [[ "$RAW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release version must be semantic version, got: $RAW_VERSION" >&2
+            exit 1
+          fi
+
+          echo "release_version=$RAW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_tag=v$RAW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set Maven project version for release
+        working-directory: hivehbase
+        run: mvn -B -ntp -s "$MAVEN_SETTINGS_PATH" versions:set -DnewVersion=${{ steps.version.outputs.release_version }} -DgenerateBackupPoms=false
+
+      - name: Build and publish package
+        working-directory: hivehbase
+        run: mvn -B -ntp -s "$MAVEN_SETTINGS_PATH" clean deploy -DskipTests
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hivehbase-release-war
+          path: hivehbase/target/hivehbase.war
+          if-no-files-found: error
+
+      - name: Create or update GitHub release
+        id: github_release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.release_version }}
+          TRIGGER_DESCRIPTION: ${{ github.event_name == 'issues' && format('Issue #{0}', github.event.issue.number) || 'workflow_dispatch' }}
+        shell: bash
+        run: |
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          cat <<EOF > "$NOTES_FILE"
+          ## 发布说明
+
+          - 发布版本：${RELEASE_VERSION}
+          - 触发来源：${TRIGGER_DESCRIPTION}
+          - 对应提交：${GITHUB_SHA}
+          - 构建命令：\`mvn -B -ntp -s \$MAVEN_SETTINGS_PATH clean deploy -DskipTests\`
+          - 测试执行：本仓库未运行测试；前置验证由外部测试框架负责
+          EOF
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$NOTES_FILE"
+          else
+            gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$NOTES_FILE" --target "$GITHUB_SHA"
+          fi
+
+          gh release upload "$RELEASE_TAG" "hivehbase/target/hivehbase.war#hivehbase-${RELEASE_VERSION}.war" --clobber
+          echo "release_url=$(gh release view "$RELEASE_TAG" --json url -q .url)" >> "$GITHUB_OUTPUT"
+
+      - name: Close trigger issue on success
+        if: success() && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        env:
+          RELEASE_URL: ${{ steps.github_release.outputs.release_url }}
+          RELEASE_VERSION: ${{ steps.version.outputs.release_version }}
+        with:
+          script: |
+            const body = [
+              '## 构建与发布已完成',
+              '',
+              `- 发布版本：${process.env.RELEASE_VERSION}`,
+              `- GitHub Release：${process.env.RELEASE_URL}`,
+              '- 构建产物：`hivehbase/target/hivehbase.war`',
+              '- Maven 发布：已推送到 GitHub Packages `org.bigdata:hivehbase`',
+              '- 执行命令：`mvn -B -ntp -s $MAVEN_SETTINGS_PATH clean deploy -DskipTests`',
+              '- 测试说明：本仓库未执行测试；发布前置验证由外部测试框架负责'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+
+      - name: Comment on failure
+        if: failure() && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '## 构建或发布失败',
+                '',
+                '- 工作流运行：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}',
+                '- 当前仓库职责：仅执行构建与发布',
+                '- 请优先检查 GitHub Packages 凭据、依赖下载权限和 WAR 构建日志'
+              ].join('\n')
+            });

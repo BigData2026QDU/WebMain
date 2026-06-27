@@ -33,6 +33,18 @@ Hive + HBase 大数据分析 Web 应用主仓库。
 
 如果在干净机器上构建，需要确保 Maven 有权限读取这些 GitHub Packages 仓库。
 
+如果是在带有 3 个共享模块工作副本的联调环境，或在 `JavaTestSkeleton` 中验证 `WebMain`，也可以先将这些模块安装到本地 Maven 仓库，再构建当前工程：
+
+```bash
+mvn -f ../DatabaseConnect/pom.xml clean install -DskipTests
+mvn -f ../JsonUtilModule/JsonUtilModule/pom.xml clean install -DskipTests
+mvn -f ../ObjectPoolModule/service-pool/pom.xml clean install -DskipTests
+mvn clean package
+```
+
+当前工程只消费这些模块产出的 Maven artifact，不直接混入其他被测项目源码。
+上面的 `-f` 路径按实际 peer 仓库 checkout 位置调整。
+
 ## 快速开始
 
 1. 克隆仓库并初始化子模块
@@ -77,8 +89,33 @@ hivehbase/
 
 ## 测试说明
 
-- 当前仓库包含后端本地单元测试，位于 `hivehbase/src/test/java`
-- Java 测试框架仓库由课程统一维护，当前仓库不负责其 CI 流程
+- 当前仓库包含后端本地单元测试代码，位于 `hivehbase/src/test/java`
+- Java 测试执行与验收由课程统一维护的 `JavaTestSkeleton` 负责
+- 当前仓库的 GitHub Actions 只负责构建和发布，不在本仓库工作流中执行测试
+- 前端子模块 `web/` 的结构检查和浏览器端测试直接在 `WebFrontEnd` 仓库自己的 CI 中执行
+
+## CI/CD
+
+### 构建工作流
+
+- 文件：`.github/workflows/ci.yml`
+- 触发：`push`、`pull_request`、`workflow_dispatch`
+- 职责：递归拉取 `AGENTS` 和 `web` 子模块，执行 `mvn clean package -DskipTests`，并上传 WAR 构建产物
+
+### 发布工作流
+
+- 文件：`.github/workflows/release.yml`
+- 触发：
+  - 外部测试框架在本仓库创建标题以 `[可发布]` 开头的 Issue
+  - 手动 `workflow_dispatch`
+- 职责：仅执行构建与发布，不在本仓库运行测试；工作流会构建 WAR、发布到 GitHub Packages、创建/更新 GitHub Release，并在成功后关闭触发 Issue
+
+### GitHub Secrets
+
+如果 `GITHUB_TOKEN` 无法读取跨仓库 GitHub Packages 依赖，需在仓库中配置以下 Secrets：
+
+- `PACKAGES_USERNAME`：有 GitHub Packages 访问权限的用户名
+- `PACKAGES_TOKEN`：具备 `read:packages` 和 `write:packages` 权限的 Token
 
 ## 开发指南
 

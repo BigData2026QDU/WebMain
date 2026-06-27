@@ -119,3 +119,20 @@ graph TB
 | Git Submodule | - | 管理 AGENTS 与 web 子模块 |
 | Axios | 1.x | 前端 HTTP 请求 |
 | ECharts | 5/6 | 图表渲染 |
+
+## 5. 构建与发布链路
+
+```text
+开发者 push / pull request
+  -> ci.yml
+  -> 递归拉取 AGENTS + web 子模块
+  -> mvn clean package -DskipTests
+  -> 上传 hivehbase.war
+
+外部测试框架创建 [可发布] Issue
+  -> release.yml
+  -> mvn clean deploy -DskipTests
+  -> 发布 GitHub Packages
+  -> 创建 / 更新 GitHub Release
+  -> 回写并关闭触发 Issue
+```

@@ -1,0 +1,6 @@
+[submodule "AGENTS"]
+	path = AGENTS
+	url = https://github.com/BigData2026QDU/AGENTS
+[submodule "web"]
+	path = web
+	url = https://github.com/BigData2026QDU/WebFrontEnd.git

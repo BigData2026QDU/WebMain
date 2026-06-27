@@ -1,61 +1,91 @@
 # hivehbase
 
-#### 介绍
-这是一个大数据学期项目。
+Hive + HBase 大数据分析 Web 应用主仓库。
 
-#### 设计原则
+## 简介
 
-1. **不允许外键。**
-2. **模块化开发。**
-     - 前后端通信模块
-     - 大数据报表渲染模块
-     - 日间/夜间切换模块
-     - ......
-3. **高性能。**
-     - 工厂获取Servlet/Service。避免创建开销
-     - 数据库连接池，避免数据库连接建立开销
-     - ......
-4. **安全&技术话语权&规范**
-     - JSON操作后端一律采用Jackson，前端一律采用axios自动解析。如果是图表渲染直接交给ECharts。减少手动处理环节。
-     - 所有CSS颜色必须使用夜间/日间模块预定义的颜色。
-     - 所有前后端通信必须通过封装的axios前后端通信模块完成，且必须传入符合要求的对象。
-     - 不得使用任何零散的Servlet/Service，必须统一在管理器/工厂获得。
-     - 不得私自建立任何数据库连接，一切连接必须从连接池取得（程序员透明。ORM自动化）。
-     - 不得使用JQuery。
-     - 不得使用Boostrap，LayUI，Tailwind等包含预定义的样式的内容。
+这是一个基于 Java Servlet + Hibernate 的学期项目，当前仓库负责后端主工程、数据库初始化脚本、架构文档，以及前端子模块接入。项目提供用户认证、报告管理、数据库元数据查询和图表展示能力。
 
-#### 技术选型
+## 功能特性
 
-1. Apache ECharts 图表【提供图表渲染接口，可以直接渲染。】
-     - https://echarts.apache.org/zh/index.html
-2. Java Servlet 网页控制器
-3. Html 静态网页【放弃JSP设计，采用html + 异步通信】
-4. Axios 异步通信【现代化】
-     - Github: https://github.com/axios/axios
-     - Official Website: https://www.axios.com/
-5. Jackson JSON传输【安全】
-     - Github: https://github.com/FasterXML/jackson
-     - Jackson JSON Series: https://www.baeldung.com/jackson
-6. Gsap 动画制作
-     - Github: https://github.com/greensock/GSAP
-     - Official Website: https://gsap.com/
-7.  **OpenRefine 数据清洗** 【方便】
-     - Github: https://github.com/OpenRefine
-     - Official Website: https://openrefine.org/
-8. HikariCP 数据库连接池【流行，规范】
-     - Github: https://github.com/brettwooldridge/HikariCP
-9. Hibernate ORM框架【流行，规范】
-     - Official Website: https://hibernate.org/
-     - Github: https://github.com/hibernate/hibernate-orm
+- 用户认证（登录/注册）
+- 报告管理（创建/编辑/删除/查看）
+- 数据库元数据查询
+- 数据可视化与图表配置
+- 日间 / 夜间主题切换
 
+## 环境要求
 
-#### 数据来源
+- JDK 17
+- Maven 3.9+
+- MySQL 8.x
+- Tomcat 9+ 或其他 Servlet 4 容器
 
-1.  **Awesome Public Datasets** : A list of topic-centric public data sources in high quality
-     - Github: https://github.com/awesomedata/awesome-public-datasets
-     - Official Website: https://awesomedataworld.slack.com
-2.  **Kaggle** : Find Open Datasets and Machine Learning Projects
-     - https://www.kaggle.com/datasets
-3.   **Google Dataset Search** : a search engine for datasets
-     - https://datasetsearch.research.google.com/help
+## 依赖说明
 
+后端依赖以下共享模块：
+
+- `org.bigdata:database-connect:1.0.0`
+- `org.example:JsonUtilModule:1.0.0`
+- `com.servicepool:service-pool:1.0.0`
+
+这些模块不在当前仓库源码中维护。
+
+如果在干净机器上构建，需要确保 Maven 有权限读取这些 GitHub Packages 仓库。
+
+## 快速开始
+
+1. 克隆仓库并初始化子模块
+   ```bash
+   git clone https://github.com/BigData2026QDU/WebMain.git
+   cd WebMain
+   git submodule update --init --recursive
+   ```
+
+2. 初始化数据库
+   - 执行 [`sql/init.sql`](./sql/init.sql)
+   - 修改 [`hivehbase/src/main/resources/hibernate.cfg.xml`](./hivehbase/src/main/resources/hibernate.cfg.xml) 中的数据库连接信息
+
+3. 构建后端
+   ```bash
+   cd hivehbase
+   mvn clean package
+   ```
+
+4. 部署
+   - 将 `hivehbase/target/hivehbase.war` 部署到 Tomcat
+   - 确保 `web/` 子模块中的前端资源被一并打包进 WAR
+
+## 项目结构
+
+```text
+hivehbase/
+├── hivehbase/              # 后端主工程（Maven WAR）
+│   ├── src/main/java/      # Java 源码
+│   ├── src/main/resources/ # Hibernate 配置
+│   ├── src/test/java/      # 单元测试
+│   └── pom.xml             # Maven 构建文件
+├── web/                    # 前端子模块（Git submodule）
+├── sql/                    # 数据库初始化脚本
+├── AGENTS/                 # 项目规范子模块
+├── Architecture.md         # 架构文档
+├── README.md               # 项目说明
+├── File_Index.md           # 文件索引
+├── .gitmodules             # 子模块声明
+└── .gitignore
+```
+
+## 测试说明
+
+- 当前仓库包含后端本地单元测试，位于 `hivehbase/src/test/java`
+- Java 测试框架仓库由课程统一维护，当前仓库不负责其 CI 流程
+
+## 开发指南
+
+- 遵循 `AGENTS/PROJECT/*.md` 规范
+- 后端包名统一使用 `org.bigdata.*`
+- 前端资源由 `web` 子模块维护，后端通过 `maven-war-plugin` 引用
+
+## 许可证
+
+本项目仅供课程学习使用。

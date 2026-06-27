@@ -75,6 +75,54 @@ jobs:
           java-version: "17"
           cache: maven
 
+      - name: Configure database connection
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import sys
+          from pathlib import Path
+          from xml.sax.saxutils import escape
+
+          required = ["DB_HOST", "DB_PORT", "DB_NAME", "DB_USERNAME", "DB_PASSWORD"]
+          missing = [name for name in required if not os.environ.get(name)]
+          if missing:
+              print(
+                  "Database secrets are missing; keeping repository hibernate.cfg.xml template: "
+                  + ", ".join(missing)
+              )
+              raise SystemExit(0)
+
+          jdbc_url = (
+              f"jdbc:mysql://{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/{os.environ['DB_NAME']}"
+              "?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8"
+          )
+          replacements = {
+              "hibernate.connection.url": escape(jdbc_url),
+              "hibernate.connection.username": escape(os.environ["DB_USERNAME"]),
+              "hibernate.connection.password": escape(os.environ["DB_PASSWORD"]),
+          }
+
+          config_path = Path("hivehbase/src/main/resources/hibernate.cfg.xml")
+          content = config_path.read_text(encoding="utf-8")
+
+          for prop_name, prop_value in replacements.items():
+              pattern = rf'(<property name="{re.escape(prop_name)}">)(.*?)(</property>)'
+              content, count = re.subn(pattern, rf"\1{prop_value}\3", content, count=1)
+              if count != 1:
+                  print(f"Failed to update {prop_name} in {config_path}", file=sys.stderr)
+                  raise SystemExit(1)
+
+          config_path.write_text(content, encoding="utf-8")
+          PY
+
       - name: Write Maven settings for GitHub Packages
         shell: bash
         run: |

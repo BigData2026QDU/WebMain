@@ -14,11 +14,16 @@ on:
 permissions:
   contents: write
   issues: write
+  packages: write
 
 jobs:
   release:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.event.issue.title, '[可发布]')
     runs-on: ubuntu-latest
+    env:
+      MAVEN_SETTINGS_PATH: ${{ runner.temp }}/settings.xml
+      MAVEN_REPO_USERNAME: ${{ github.actor }}
+      MAVEN_REPO_TOKEN: ${{ github.token }}
 
     steps:
       - name: Acknowledge release trigger
@@ -69,6 +74,23 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+
+      - name: Write Maven settings for GitHub Packages
+        shell: bash
+        run: |
+          cat <<EOF > "$MAVEN_SETTINGS_PATH"
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>github-webmain</id>
+                <username>${MAVEN_REPO_USERNAME}</username>
+                <password>${MAVEN_REPO_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
 
       - name: Resolve release version
         id: version
@@ -129,8 +151,8 @@ jobs:
       - name: Set Maven project version for release
         run: mvn -B -ntp -f hivehbase/pom.xml versions:set -DnewVersion=${{ steps.version.outputs.release_version }} -DgenerateBackupPoms=false
 
-      - name: Build WAR package
-        run: mvn -B -ntp -f hivehbase/pom.xml clean package -DskipTests
+      - name: Build and publish WAR package
+        run: mvn -B -ntp -s "$MAVEN_SETTINGS_PATH" -f hivehbase/pom.xml clean deploy -DskipTests
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
@@ -160,8 +182,9 @@ jobs:
           - 发布版本：${RELEASE_VERSION}
           - 触发来源：${TRIGGER_DESCRIPTION}
           - 对应提交：${GITHUB_SHA}
-          - 构建命令：\`mvn -B -ntp -f hivehbase/pom.xml clean package -DskipTests\`
+          - 构建命令：\`mvn -B -ntp -s \$MAVEN_SETTINGS_PATH -f hivehbase/pom.xml clean deploy -DskipTests\`
           - 依赖准备：先安装 DatabaseConnectModule、JsonUtilModule、ObjectPoolModule 的本地 artifact
+          - Maven Packages：\`org.bigdata:hivehbase:${RELEASE_VERSION}:war\`
           - 测试执行：本仓库未运行测试；前置验证由外部测试框架负责
           EOF
 
@@ -188,6 +211,7 @@ jobs:
               `- 发布版本：${process.env.RELEASE_VERSION}`,
               `- GitHub Release：${process.env.RELEASE_URL}`,
               '- 构建产物：`hivehbase/target/hivehbase.war`',
+              '- GitHub Packages：`org.bigdata:hivehbase:${process.env.RELEASE_VERSION}:war`',
               '- 依赖准备：已先安装另外三个 Java 模块的 artifact',
               '- 测试说明：本仓库未执行测试；发布前置验证由外部测试框架负责'
             ].join('\n');

@@ -45,7 +45,7 @@ public class RegisterServlet extends HttpServlet {
         String requestBody = sb.toString();
         System.out.println("Register attempt with body: " + requestBody);
 
-        UserService userService = null;
+        RegisterRequest registerRequest;
         try {
             if (requestBody.trim().isEmpty()) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -53,7 +53,16 @@ public class RegisterServlet extends HttpServlet {
                 return;
             }
 
-            RegisterRequest registerRequest = JsonUtil.fromJson(requestBody, RegisterRequest.class);
+            registerRequest = JsonUtil.fromJson(requestBody, RegisterRequest.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            JsonUtil.writeJsonResponse(resp, Response.error(HttpServletResponse.SC_BAD_REQUEST, "Invalid JSON format: " + e.getMessage()));
+            return;
+        }
+
+        UserService userService = null;
+        try {
             String username = registerRequest.getUsername();
             String password = registerRequest.getPassword();
 
@@ -76,8 +85,8 @@ public class RegisterServlet extends HttpServlet {
             }
         } catch (Exception e) {
             e.printStackTrace();
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            JsonUtil.writeJsonResponse(resp, Response.error(HttpServletResponse.SC_BAD_REQUEST, "Invalid JSON format: " + e.getMessage()));
+            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            JsonUtil.writeJsonResponse(resp, Response.error(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Register failed: " + e.getMessage()));
         } finally {
             if (userService != null) {
                 poolManager.returnService(UserService.class, userService);

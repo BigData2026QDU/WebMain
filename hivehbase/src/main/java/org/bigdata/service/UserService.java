@@ -45,8 +45,7 @@ public class UserService {
             session.getTransaction().commit();
             return newUser;
         } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+            throw new IllegalStateException("Failed to register user: " + summarizeException(e), e);
         }
     }
 
@@ -56,8 +55,28 @@ public class UserService {
             query.setParameter("username", username);
             return query.uniqueResult();
         } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+            throw new IllegalStateException("Failed to query user by username: " + summarizeException(e), e);
         }
+    }
+
+    private static String summarizeException(Throwable throwable) {
+        Throwable current = throwable;
+        StringBuilder summary = new StringBuilder();
+        while (current != null) {
+            if (summary.length() > 0) {
+                summary.append(" <- ");
+            }
+            summary.append(current.getClass().getName());
+            String message = current.getMessage();
+            if (message != null && !message.trim().isEmpty()) {
+                summary.append(": ").append(message.trim());
+            }
+            Throwable next = current.getCause();
+            if (next == null || next == current) {
+                break;
+            }
+            current = next;
+        }
+        return summary.toString();
     }
 }

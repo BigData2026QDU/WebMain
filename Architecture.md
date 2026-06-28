@@ -87,8 +87,13 @@ graph TB
 ### 2.3 共享依赖模块
 
 - `database-connect`：提供 `HibernateUtil`、`DatabaseMetaService`、对象池工具等
+- `database-connect` 同时负责运行时数据库配置覆盖（`DB_*` / JVM 参数）
 - `JsonUtilModule`：提供 `JsonUtil`
 - `service-pool`：提供通用对象池实现
+
+### 2.4 数据库初始化
+
+`org.bigdata.util.DatabaseBootstrap` 负责通过 `HibernateUtil` 执行 `sql/init.sql`。脚本仍保留可读的 DDL/DML，但推荐入口是工具类，便于复用运行时数据库参数并避免绕过项目数据库访问模块。
 
 ### 2.4 数据模型
 
@@ -127,11 +132,13 @@ graph TB
   -> ci.yml
   -> 递归拉取 AGENTS + web 子模块
   -> mvn clean package -DskipTests
+  -> WAR 保持模板数据库配置
   -> 上传 hivehbase.war
 
 外部测试框架创建 [可发布] Issue
   -> release.yml
   -> mvn clean deploy -DskipTests
+  -> WAR 不内嵌数据库 secret
   -> 发布 GitHub Packages
   -> 创建 / 更新 GitHub Release
   -> 回写并关闭触发 Issue

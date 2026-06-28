@@ -7,6 +7,7 @@
 | README.md | 项目说明 | 主仓库入口文档 |
 | Architecture.md | 架构文档 | 描述主仓库、子模块和共享依赖关系 |
 | File_Index.md | 文件索引 | 当前文件清单 |
+| Deployment.md | 部署说明 | 新机器部署、数据库初始化、Tomcat 运行时参数 |
 | .gitmodules | 子模块声明 | 声明 `AGENTS` 与 `web` 子模块 |
 | .gitignore | Git 忽略规则 | 忽略构建产物、IDE 配置等 |
 | .github/workflows/ci.yml | 构建工作流 | 负责递归子模块构建与 WAR 产物上传 |
@@ -63,12 +64,13 @@
 | 文件路径 | 作用 | 说明 |
 |---------|------|------|
 | SecurityUtil.java | 安全工具 | 密码哈希 |
+| DatabaseBootstrap.java | 数据库初始化工具 | 通过 `HibernateUtil` 执行 `sql/init.sql`，支持运行时数据库参数 |
 
 ### 配置与构建
 
 | 文件路径 | 作用 | 说明 |
 |---------|------|------|
-| hivehbase/src/main/resources/hibernate.cfg.xml | Hibernate 配置 | 数据库连接和实体映射 |
+| hivehbase/src/main/resources/hibernate.cfg.xml | Hibernate 配置 | `test_db` 模板连接和实体映射，运行时可由 `DB_*` 覆盖 |
 | hivehbase/pom.xml | Maven 配置 | WAR 打包与后端依赖声明 |
 
 ### 测试代码
@@ -107,6 +109,6 @@
 
 | 模块 | 说明 |
 |------|------|
-| `org.bigdata:database-connect` | 提供 `HibernateUtil`、`DatabaseMetaService` 等 |
+| `org.bigdata:database-connect` | 提供 `HibernateUtil`、`DatabaseMetaService` 和运行时数据库配置覆盖能力 |
 | `org.example:JsonUtilModule` | 提供 `JsonUtil` |
 | `com.servicepool:service-pool` | 提供通用服务池实现 |

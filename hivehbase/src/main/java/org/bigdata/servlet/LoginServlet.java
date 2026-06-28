@@ -46,7 +46,7 @@ public class LoginServlet extends HttpServlet {
         String requestBody = sb.toString();
         System.out.println("Login attempt with body: " + requestBody);
 
-        UserService userService = null;
+        LoginRequest loginRequest;
         try {
             if (requestBody.trim().isEmpty()) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -54,7 +54,15 @@ public class LoginServlet extends HttpServlet {
                 return;
             }
 
-            LoginRequest loginRequest = JsonUtil.fromJson(requestBody, LoginRequest.class);
+            loginRequest = JsonUtil.fromJson(requestBody, LoginRequest.class);
+        } catch (Exception e) {
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            JsonUtil.writeJsonResponse(resp, Response.error(HttpServletResponse.SC_BAD_REQUEST, "Invalid JSON format: " + e.getMessage()));
+            return;
+        }
+
+        UserService userService = null;
+        try {
             String username = loginRequest.getUsername();
             String password = loginRequest.getPassword();
 
@@ -75,8 +83,8 @@ public class LoginServlet extends HttpServlet {
             }
         } catch (Exception e) {
             e.printStackTrace();
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            JsonUtil.writeJsonResponse(resp, Response.error(HttpServletResponse.SC_BAD_REQUEST, "Invalid JSON format: " + e.getMessage()));
+            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            JsonUtil.writeJsonResponse(resp, Response.error(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Login failed due to server error."));
         } finally {
             if (userService != null) {
                 poolManager.returnService(UserService.class, userService);

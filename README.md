@@ -25,7 +25,7 @@ Hive + HBase 大数据分析 Web 应用主仓库。
 
 后端依赖以下共享模块：
 
-- `org.bigdata:database-connect:1.0.0`
+- `org.bigdata:database-connect:1.0.2`
 - `org.example:JsonUtilModule:1.0.0`
 - `com.servicepool:service-pool:1.0.0`
 
@@ -55,8 +55,21 @@ mvn clean package
    ```
 
 2. 初始化数据库
-   - 执行 [`sql/init.sql`](./sql/init.sql)
-   - 修改 [`hivehbase/src/main/resources/hibernate.cfg.xml`](./hivehbase/src/main/resources/hibernate.cfg.xml) 中的数据库连接信息
+   - 推荐通过项目工具类执行 [`sql/init.sql`](./sql/init.sql)，避免绕过 Hibernate/util 层：
+     ```bash
+     mvn -B -f hivehbase/pom.xml org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+       -Dexec.mainClass=org.bigdata.util.DatabaseBootstrap \
+       -Dexec.classpathScope=runtime \
+       -Dbootstrap.script=sql/init.sql \
+       -Dbootstrap.skipCreateDatabase=true \
+       -Ddb.host=127.0.0.1 \
+       -Ddb.port=3306 \
+       -Ddb.name=test_db \
+       -Ddb.username=CHANGE_ME \
+       -Ddb.password=CHANGE_ME
+     ```
+   - 修改 [`hivehbase/src/main/resources/hibernate.cfg.xml`](./hivehbase/src/main/resources/hibernate.cfg.xml) 中的数据库连接模板
+   - 或在运行容器时注入 `DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`
 
 3. 构建后端
    ```bash
@@ -67,6 +80,7 @@ mvn clean package
 4. 部署
    - 将 `hivehbase/target/hivehbase.war` 部署到 Tomcat
    - 确保 `web/` 子模块中的前端资源被一并打包进 WAR
+   - 新机器部署步骤详见 [`Deployment.md`](./Deployment.md)
 
 ## 项目结构
 
@@ -116,6 +130,8 @@ hivehbase/
 
 - `PACKAGES_USERNAME`：有 GitHub Packages 访问权限的用户名
 - `PACKAGES_TOKEN`：具备 `read:packages` 和 `write:packages` 权限的 Token
+
+构建与发布 WAR 不需要把数据库凭据写入仓库或产物。运行时数据库连接请通过 `hibernate.cfg.xml` 模板配合环境变量 / JVM 参数注入。
 
 ## 开发指南
 

@@ -30,6 +30,19 @@ public class ReportServlet extends HttpServlet {
                 return;
             }
 
+            BlockRoute blockRoute = parseBlockRoute(req);
+            if (blockRoute != null) {
+                int limit = parseLimit(req, 200);
+                Map<String, Object> block = reportService.loadReportBlock(blockRoute.bindex, blockRoute.bid, limit);
+                if (block == null) {
+                    resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    JsonUtil.writeJsonResponse(resp, Response.error(404, "未找到报告块：bindex=" + blockRoute.bindex + ", bid=" + blockRoute.bid));
+                    return;
+                }
+                JsonUtil.writeJsonResponse(resp, Response.success(block));
+                return;
+            }
+
             int bindex = parseBindex(req);
             int limit = parseLimit(req, 200);
 
@@ -90,6 +103,26 @@ public class ReportServlet extends HttpServlet {
         return noPath && noParams;
     }
 
+    private static BlockRoute parseBlockRoute(HttpServletRequest req) {
+        String pathInfo = req.getPathInfo();
+        if (pathInfo == null || pathInfo.trim().isEmpty() || "/".equals(pathInfo)) {
+            return null;
+        }
+
+        String[] parts = pathInfo.replaceFirst("^/+", "").split("/");
+        if (parts.length != 3 || !"blocks".equals(parts[1])) {
+            return null;
+        }
+
+        try {
+            int bindex = Integer.parseInt(parts[0].trim());
+            long bid = Long.parseLong(parts[2].trim());
+            return new BlockRoute(bindex, bid);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("报告块路径格式错误，期望 /reports/{bindex}/blocks/{bid}，收到：" + pathInfo);
+        }
+    }
+
     private static boolean isRefresh(HttpServletRequest req) {
         String raw = req.getParameter("refresh");
         if (raw == null) return false;
@@ -130,6 +163,16 @@ public class ReportServlet extends HttpServlet {
             return Math.min(v, 2000);
         } catch (NumberFormatException e) {
             return defaultValue;
+        }
+    }
+
+    private static final class BlockRoute {
+        private final int bindex;
+        private final long bid;
+
+        private BlockRoute(int bindex, long bid) {
+            this.bindex = bindex;
+            this.bid = bid;
         }
     }
 }

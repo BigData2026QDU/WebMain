@@ -1,0 +1,2 @@
+ALTER TABLE `blog`
+    ADD COLUMN `is_realtime` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0=普通块,1=实时块';

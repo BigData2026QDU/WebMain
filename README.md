@@ -12,6 +12,7 @@ Hive + HBase 大数据分析 Web 应用主仓库。
 - 报告管理（创建/编辑/删除/查看）
 - 数据库元数据查询
 - 数据可视化与图表配置
+- 报表块级实时刷新（按块轮询最新数据）
 - 日间 / 夜间主题切换
 
 ## 环境要求
@@ -92,7 +93,7 @@ hivehbase/
 │   ├── src/test/java/      # 单元测试
 │   └── pom.xml             # Maven 构建文件
 ├── web/                    # 前端子模块（Git submodule）
-├── sql/                    # 数据库初始化脚本
+├── sql/                    # 数据库初始化与迁移脚本
 ├── AGENTS/                 # 项目规范子模块
 ├── Architecture.md         # 架构文档
 ├── README.md               # 项目说明

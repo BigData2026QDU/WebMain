@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS `user` (
 -- - btype     : 0=chart, 1=text
 -- - paragraph : 内容块顺序
 -- - content   : 文本内容或图表配置串
+-- - is_realtime : 是否按块实时刷新
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `blog` (
     `bid` BIGINT NOT NULL AUTO_INCREMENT,
@@ -59,6 +60,7 @@ CREATE TABLE IF NOT EXISTS `blog` (
     `btype` INT NOT NULL,
     `paragraph` INT NOT NULL,
     `content` TEXT,
+    `is_realtime` TINYINT(1) NOT NULL DEFAULT 0,
     PRIMARY KEY (`bid`),
     KEY `idx_blog_bindex` (`bindex`)
 ) ENGINE=InnoDB

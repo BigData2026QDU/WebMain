@@ -4,7 +4,19 @@ import org.bigdata.tool.HibernateUtil;
 import org.hibernate.query.NativeQuery;
 
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 public class BlogReportService {
@@ -15,9 +27,11 @@ public class BlogReportService {
     private static final Set<String> SUPPORTED_CHART_TYPES = new HashSet<>(Arrays.asList("bar", "line", "pie", "scatter", "mix"));
     private static final long REPORT_CACHE_TTL_MS = 30_000L;
     private static final long LIST_CACHE_TTL_MS = 10_000L;
+    private static final int DEFAULT_REALTIME_INTERVAL_MS = 1_000;
 
     private final LruCache<CacheKey, TimedValue<Map<String, Object>>> cache = new LruCache<>(128);
     private final LruCache<Integer, TimedValue<List<Map<String, Object>>>> listCache = new LruCache<>(16);
+    private volatile Boolean realtimeColumnPresent;
 
     public Map<String, Object> loadReport(int bindex, int limit) {
         return loadReport(bindex, limit, false);
@@ -35,9 +49,12 @@ public class BlogReportService {
         }
 
         Map<String, Object> report = HibernateUtil.executeQuery(session -> {
-            NativeQuery<?> query = session.createNativeQuery(
-                "SELECT btype, paragraph, content FROM blog WHERE bindex = :bindex ORDER BY paragraph ASC, bid ASC"
-            );
+            boolean hasRealtimeColumn = hasRealtimeColumn(session);
+            String sql = hasRealtimeColumn
+                ? "SELECT bid, btype, paragraph, content, is_realtime FROM blog WHERE bindex = :bindex ORDER BY paragraph ASC, bid ASC"
+                : "SELECT bid, btype, paragraph, content FROM blog WHERE bindex = :bindex ORDER BY paragraph ASC, bid ASC";
+
+            NativeQuery<?> query = session.createNativeQuery(sql);
             query.setParameter("bindex", bindex);
             List<?> rows = query.getResultList();
 
@@ -47,31 +64,16 @@ public class BlogReportService {
 
             List<Map<String, Object>> sections = new ArrayList<>();
             for (Object item : rows) {
-                Object[] row = item instanceof Object[] ? (Object[]) item : new Object[]{ item };
-                Integer btype = toInteger(safeGet(row, 0));
-                String content = toStringSafe(safeGet(row, 2)).trim();
-
-                if (btype != null && btype == 0) {
-                    ChartSpec spec = parseChartSpec(content);
-                    Map<String, Object> chart = loadChartTable(session, spec, key.limit);
-                    Map<String, Object> block = new LinkedHashMap<>();
-                    block.put("type", "chart");
-                    block.put("data", chart);
-                    sections.add(block);
-                } else {
-                    Map<String, Object> block = new LinkedHashMap<>();
-                    block.put("type", "text");
-                    block.put("data", content);
-                    sections.add(block);
-                }
+                sections.add(buildBlockFromRow(session, bindex, item, hasRealtimeColumn, key.limit));
             }
 
             Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("bindex", bindex);
             payload.put("title", "报告 " + bindex);
             payload.put("tag", "blog");
             payload.put("updatedAt", nowText());
             payload.put("source", "MySQL.blog");
-            payload.put("summary", "由 blog 表段落动态拼装（text/chart），并在服务端做缓存。");
+            payload.put("summary", "由 blog 表内容块动态拼装（text/chart），支持按块实时刷新。");
             payload.put("sections", sections);
             return payload;
         });
@@ -83,6 +85,32 @@ public class BlogReportService {
         }
 
         return report;
+    }
+
+    public Map<String, Object> loadReportBlock(int bindex, long bid, int limit) {
+        if (bindex <= 0) {
+            throw new IllegalArgumentException("bindex must be positive");
+        }
+        if (bid <= 0) {
+            throw new IllegalArgumentException("bid must be positive");
+        }
+
+        return HibernateUtil.executeQuery(session -> {
+            boolean hasRealtimeColumn = hasRealtimeColumn(session);
+            String sql = hasRealtimeColumn
+                ? "SELECT bid, btype, paragraph, content, is_realtime FROM blog WHERE bindex = :bindex AND bid = :bid"
+                : "SELECT bid, btype, paragraph, content FROM blog WHERE bindex = :bindex AND bid = :bid";
+
+            NativeQuery<?> query = session.createNativeQuery(sql);
+            query.setParameter("bindex", bindex);
+            query.setParameter("bid", bid);
+            List<?> rows = query.getResultList();
+            if (rows == null || rows.isEmpty()) {
+                return null;
+            }
+
+            return buildBlockFromRow(session, bindex, rows.get(0), hasRealtimeColumn, normalizeLimit(limit));
+        });
     }
 
     public List<Map<String, Object>> listReports(int limit) {
@@ -172,6 +200,70 @@ public class BlogReportService {
         }
     }
 
+    boolean hasRealtimeColumn(org.hibernate.Session session) {
+        Boolean cached = realtimeColumnPresent;
+        if (cached != null) {
+            return cached;
+        }
+
+        NativeQuery<?> query = session.createNativeQuery(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " +
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'blog' AND COLUMN_NAME = 'is_realtime'"
+        );
+        Number count = (Number) query.uniqueResult();
+        boolean present = count != null && count.intValue() > 0;
+        realtimeColumnPresent = present;
+        return present;
+    }
+
+    private Map<String, Object> buildBlockFromRow(
+        org.hibernate.Session session,
+        int bindex,
+        Object item,
+        boolean hasRealtimeColumn,
+        int limit
+    ) {
+        Object[] row = item instanceof Object[] ? (Object[]) item : new Object[]{ item };
+        Long bid = toLong(safeGet(row, 0));
+        Integer btype = toInteger(safeGet(row, 1));
+        Integer paragraph = toInteger(safeGet(row, 2));
+        String content = toStringSafe(safeGet(row, 3)).trim();
+        boolean realtime = hasRealtimeColumn && toBoolean(safeGet(row, 4));
+        return buildBlockPayload(session, bindex, bid, btype, paragraph, content, realtime, limit);
+    }
+
+    private Map<String, Object> buildBlockPayload(
+        org.hibernate.Session session,
+        int bindex,
+        Long bid,
+        Integer btype,
+        Integer paragraph,
+        String content,
+        boolean realtime,
+        int limit
+    ) {
+        Map<String, Object> block = new LinkedHashMap<>();
+        block.put("id", bid);
+        block.put("bindex", bindex);
+        block.put("paragraph", paragraph != null ? paragraph : 0);
+        block.put("realtime", realtime);
+        if (realtime) {
+            block.put("refreshIntervalMs", DEFAULT_REALTIME_INTERVAL_MS);
+        }
+
+        if (btype != null && btype == 0) {
+            ChartSpec spec = parseChartSpec(content);
+            Map<String, Object> chart = loadChartTable(session, spec, limit);
+            block.put("type", "chart");
+            block.put("data", chart);
+            block.put("query", buildChartQuery(spec));
+        } else {
+            block.put("type", "text");
+            block.put("data", content);
+        }
+        return block;
+    }
+
     private void evictByBindex(int bindex) {
         synchronized (cache) {
             Iterator<CacheKey> it = cache.keySet().iterator();
@@ -207,6 +299,24 @@ public class BlogReportService {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static Long toLong(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number) return ((Number) value).longValue();
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static boolean toBoolean(Object value) {
+        if (value == null) return false;
+        if (value instanceof Boolean) return (Boolean) value;
+        if (value instanceof Number) return ((Number) value).intValue() != 0;
+        String text = String.valueOf(value).trim().toLowerCase();
+        return "1".equals(text) || "true".equals(text) || "yes".equals(text) || "y".equals(text);
     }
 
     private static String nowText() {
@@ -268,6 +378,16 @@ public class BlogReportService {
         return new ChartSpec(tableName, selectedColumns, chartType);
     }
 
+    private static Map<String, Object> buildChartQuery(ChartSpec spec) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put("table", spec.tableName);
+        query.put("columns", new ArrayList<>(spec.selectedColumns));
+        if (spec.chartType != null && !spec.chartType.trim().isEmpty()) {
+            query.put("chartType", spec.chartType);
+        }
+        return query;
+    }
+
     private static Map<String, Object> loadChartTable(org.hibernate.Session session, ChartSpec spec, int limit) {
         requireSafeTableName(spec.tableName);
 
@@ -309,7 +429,7 @@ public class BlogReportService {
         NativeQuery<?> dataQuery = session.createNativeQuery(sql);
         List<?> results = dataQuery.getResultList();
 
-        List<List<Object>> rows = new ArrayList<>();
+        List<List<Object>> rows = new LinkedList<>();
         for (Object r : results) {
             if (r instanceof Object[]) {
                 rows.add(Arrays.asList((Object[]) r));
@@ -359,7 +479,9 @@ public class BlogReportService {
 
         private ChartSpec(String tableName, List<String> selectedColumns, String chartType) {
             this.tableName = tableName;
-            this.selectedColumns = selectedColumns == null ? Collections.emptyList() : selectedColumns;
+            this.selectedColumns = selectedColumns == null
+                ? Collections.emptyList()
+                : new ArrayList<>(new LinkedHashSet<>(selectedColumns));
             this.chartType = chartType;
         }
 

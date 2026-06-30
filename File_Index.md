@@ -12,7 +12,8 @@
 | .gitignore | Git 忽略规则 | 忽略构建产物、IDE 配置等 |
 | .github/workflows/ci.yml | 构建工作流 | 负责递归子模块构建与 WAR 产物上传 |
 | .github/workflows/release.yml | 发布工作流 | 响应 `[可发布]` Issue 或手动触发，执行发布 |
-| sql/init.sql | 数据库初始化 | 初始化 `user` 与 `blog` 两张业务表 |
+| sql/init.sql | 数据库初始化 | 初始化 `user` 与 `blog` 两张业务表，并包含 `blog.is_realtime` |
+| sql/migrations/20260630_add_blog_is_realtime.sql | 增量迁移 | 为已上线数据库补充块级实时刷新字段 |
 
 ## 后端主工程 `hivehbase/`
 
@@ -35,8 +36,8 @@
 | 文件路径 | 作用 | 说明 |
 |---------|------|------|
 | UserService.java | 用户服务 | 登录 / 注册逻辑 |
-| BlogReportService.java | 报告服务 | 报告装配、列表、缓存、删除 |
-| BlogEditorService.java | 编辑器服务 | 报告编辑读写逻辑 |
+| BlogReportService.java | 报告服务 | 报告装配、块级实时刷新、列表、缓存、删除 |
+| BlogEditorService.java | 编辑器服务 | 报告编辑读写与实时块标记持久化 |
 
 #### `hivehbase/src/main/java/org/bigdata/servlet/`
 
@@ -44,7 +45,7 @@
 |---------|------|------|
 | LoginServlet.java | 登录控制器 | `POST /login` |
 | RegisterServlet.java | 注册控制器 | `POST /register` |
-| ReportServlet.java | 报告控制器 | `GET/POST/DELETE /reports/*` |
+| ReportServlet.java | 报告控制器 | `GET/POST/DELETE /reports/*`，支持 `/reports/{bindex}/blocks/{bid}` |
 | ChartDataServlet.java | 图表数据控制器 | `GET /api/chart/family-impact` |
 | DatabaseMetaServlet.java | 数据库元数据控制器 | `GET /api/database/*` |
 | BlogEditorServlet.java | 编辑器控制器 | `GET/POST/DELETE /api/blog/editor/*` |
